@@ -1,16 +1,16 @@
 (function() {
     const SEED = {
         jobs: [
-            {id:"J-101", client:"Tata Motors", clientId:"C-1", project:"Chassis Bracket", status:"PENDING", cost:15000, date:"2023-10-01"},
-            {id:"J-102", client:"Mahindra", clientId:"C-2", project:"Gearbox Mount", status:"ACTIVE", cost:8500, date:"2023-10-05"},
-            {id:"J-103", client:"Tata Motors", clientId:"C-1", project:"Door Hinge Prototype", status:"DONE", cost:12000, date:"2023-09-20"},
-            {id:"J-104", client:"Bajaj Auto", clientId:"C-3", project:"Kickstand Assembly", status:"DONE", cost:4500, date:"2023-09-15"},
-            {id:"J-105", client:"Mahindra", clientId:"C-2", project:"Bumper Guard", status:"ACTIVE", cost:22000, date:"2023-10-10"}
+            {id:"J-101", client:"Tata Motors", clientId:"C-1", project:"Chassis Bracket", status:"PENDING", cost:15000, date:"2023-10-01", materialLog:[], expenses:[], advances:[]},
+            {id:"J-102", client:"Mahindra", clientId:"C-2", project:"Gearbox Mount", status:"ACTIVE", cost:8500, date:"2023-10-05", materialLog:[], expenses:[], advances:[]},
+            {id:"J-103", client:"Tata Motors", clientId:"C-1", project:"Door Hinge Prototype", status:"DONE", cost:12000, date:"2023-09-20", materialLog:[], expenses:[], advances:[]},
+            {id:"J-104", client:"Bajaj Auto", clientId:"C-3", project:"Kickstand Assembly", status:"DONE", cost:4500, date:"2023-09-15", materialLog:[], expenses:[], advances:[]},
+            {id:"J-105", client:"Mahindra", clientId:"C-2", project:"Bumper Guard", status:"ACTIVE", cost:22000, date:"2023-10-10", materialLog:[], expenses:[], advances:[]}
         ],
         clients: [
-            {id:"C-1", name:"Ramesh Engineer", company:"Tata Motors", phone:"919999999999", history:["J-101", "J-99", "J-103"]},
-            {id:"C-2", name:"Suresh Patil", company:"Mahindra", phone:"918888888888", history:["J-102", "J-105"]},
-            {id:"C-3", name:"Amit Singh", company:"Bajaj Auto", phone:"917777777777", history:["J-104"]}
+            {id:"C-1", name:"Ramesh Engineer", company:"Tata Motors", phone:"919999999999", history:["J-101", "J-99", "J-103"], password:"123"},
+            {id:"C-2", name:"Suresh Patil", company:"Mahindra", phone:"918888888888", history:["J-102", "J-105"], password:"123"},
+            {id:"C-3", name:"Amit Singh", company:"Bajaj Auto", phone:"917777777777", history:["J-104"], password:"123"}
         ],
         inventory: [
             {id:"I-1", item:"MS Sheet 2mm", stock:15, unit:"sheet", usage: 8},
@@ -32,12 +32,29 @@
             {id:"S-3", title:"Industrial Rack", tag:"Industrial", color:"#475569"},
             {id:"S-4", title:"Garden Gate", tag:"Gate", color:"#0f172a"},
             {id:"S-5", title:"Balcony Railing", tag:"Grill", color:"#1e293b"}
-        ]
+        ],
+        offers: [
+            {id:"O-1", title:"Monsoon Sale", desc:"10% off on Gate Fabrication"},
+            {id:"O-2", title:"Free Design", desc:"Free CAD Design for orders > 50k"}
+        ],
+        settings: {
+            theme: "dark",
+            whatsappBlurb: "Hello, I am interested in a fabrication job.",
+            shopName: "Manku Metal Works"
+        }
     };
 
     const loadData = () => {
         const stored = localStorage.getItem('mmw_db');
-        return stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(SEED));
+        if (!stored) return JSON.parse(JSON.stringify(SEED));
+
+        const parsed = JSON.parse(stored);
+        // Robust Merge: Ensure all SEED arrays exist in parsed data
+        // This fixes the crash where new features (showcase) are missing in old localStorage
+        Object.keys(SEED).forEach(key => {
+            if (!parsed[key]) parsed[key] = SEED[key];
+        });
+        return parsed;
     };
 
     let DB = loadData();
@@ -60,9 +77,24 @@
             return { json: async () => DB };
         }
 
+        // --- AUTH ---
+        if (url === '/api/login' && method === 'POST') {
+            const { user, pass } = body;
+            if (user === 'admin' && pass === 'admin') return { json: async () => ({role:'ADMIN', name:'Admin'}) };
+            const client = DB.clients.find(c => c.phone === user && (c.password === pass || pass === '123'));
+            if (client) return { json: async () => ({role:'CLIENT', ...client}) };
+            return { status: 401, json: async () => ({error:'Invalid Credentials'}) };
+        }
+
         // --- JOBS ---
         if (url === '/api/jobs' && method === 'POST') {
-            const newJob = { ...body, id: `J-${Date.now()}` };
+            // Visitor request or Admin create
+            const newJob = {
+                id: `J-${Date.now()}`,
+                status: "PENDING",
+                materialLog:[], expenses:[], advances:[],
+                ...body
+            };
             DB.jobs.unshift(newJob);
             saveData();
             return { json: async () => newJob };
@@ -122,6 +154,13 @@
             DB.templates.push(newTemplate);
             saveData();
             return { json: async () => newTemplate };
+        }
+
+        // --- SETTINGS ---
+        if (url === '/api/settings' && method === 'PUT') {
+            DB.settings = { ...DB.settings, ...body };
+            saveData();
+            return { json: async () => DB.settings };
         }
 
         return { json: async () => DB };

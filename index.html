@@ -54,7 +54,7 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users } = LucideReact;
+        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users, Settings, LogOut, Download } = LucideReact;
 
         // 1. FABRICATOR HUD (Camera + Horizon + Grid)
         const FabricatorHUD = ({ onClose }) => {
@@ -102,7 +102,7 @@
             );
         };
 
-        // 2. TOOLS MODAL (Pie Cut, Triangle, Quick Radius, Level, Grid, Convert, SVG)
+        // 2. TOOLS MODAL
         const ToolsModal = ({ onClose }) => {
             const [mode, setMode] = useState('PIE');
             const [res, setRes] = useState(null);
@@ -115,7 +115,10 @@
             const [gridSize, setGridSize] = useState(50);
 
             // ShapeGen State
-            const [svgParams, setSvgParams] = useState({od:100, id:50, holes:4, hdia:10});
+            const [svgParams, setSvgParams] = useState({shape:'FLANGE', w:100, h:100, od:100, id:50, holes:4, hdia:10, scale:1});
+
+            // Notcher State
+            const [notchParams, setNotchParams] = useState({tubeOd: 40, headerOd: 40, angle: 90});
 
             useEffect(() => {
                 if (mode !== 'LEVEL') return;
@@ -171,13 +174,13 @@
                 setRes({text: `${out.toFixed(3)} ${unit}`, type: 'text'});
             };
 
-            const downloadSvg = () => {
-                const svgData = document.getElementById("gen-svg").outerHTML;
+            const downloadSvg = (id, name) => {
+                const svgData = document.getElementById(id).outerHTML;
                 const blob = new Blob([svgData], {type:"image/svg+xml;charset=utf-8"});
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
                 link.href = url;
-                link.download = "manku_flange.svg";
+                link.download = name;
                 document.body.appendChild(link);
                 link.click();
             };
@@ -188,7 +191,7 @@
                         <button onClick={onClose} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
                         <h2 className="font-stencil text-2xl text-rust mb-4">FABRICATOR SUITE</h2>
                         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
-                            {['PIE', 'TRIANGLE', 'RADIUS', 'LEVEL', 'GRID', 'CONVERT', 'SVG'].map(m => <button key={m} onClick={()=>{setMode(m);setRes(null)}} className={`px-2 py-1 text-xs font-bold whitespace-nowrap ${mode===m?'bg-rust text-black':'bg-surface border border-metal'}`}>{m}</button>)}
+                            {['PIE', 'TRIANGLE', 'RADIUS', 'LEVEL', 'GRID', 'CONVERT', 'SVG', 'NOTCHER'].map(m => <button key={m} onClick={()=>{setMode(m);setRes(null)}} className={`px-2 py-1 text-xs font-bold whitespace-nowrap ${mode===m?'bg-rust text-black':'bg-surface border border-metal'}`}>{m}</button>)}
                         </div>
 
                         {mode === 'PIE' && (
@@ -290,26 +293,58 @@
                         {mode === 'SVG' && (
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <label>OD (mm) <input value={svgParams.od} onChange={e=>setSvgParams({...svgParams, od:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
-                                    <label>ID (mm) <input value={svgParams.id} onChange={e=>setSvgParams({...svgParams, id:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
-                                    <label>Holes <input value={svgParams.holes} onChange={e=>setSvgParams({...svgParams, holes:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
-                                    <label>Hole Dia <input value={svgParams.hdia} onChange={e=>setSvgParams({...svgParams, hdia:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
+                                    <label className="col-span-2">SHAPE <select value={svgParams.shape} onChange={e=>setSvgParams({...svgParams, shape:e.target.value})} className="w-full bg-black border border-metal p-1"><option value="FLANGE">Flange (Round)</option><option value="PLATE">Base Plate (Rect)</option></select></label>
+                                    {svgParams.shape === 'FLANGE' && <><label>OD <input type="number" value={svgParams.od} onChange={e=>setSvgParams({...svgParams, od:e.target.value})} className="w-full bg-black border border-metal p-1" /></label><label>ID <input type="number" value={svgParams.id} onChange={e=>setSvgParams({...svgParams, id:e.target.value})} className="w-full bg-black border border-metal p-1" /></label></>}
+                                    {svgParams.shape === 'PLATE' && <><label>W <input type="number" value={svgParams.w} onChange={e=>setSvgParams({...svgParams, w:e.target.value})} className="w-full bg-black border border-metal p-1" /></label><label>H <input type="number" value={svgParams.h} onChange={e=>setSvgParams({...svgParams, h:e.target.value})} className="w-full bg-black border border-metal p-1" /></label></>}
+                                    <label>Holes <input type="number" value={svgParams.holes} onChange={e=>setSvgParams({...svgParams, holes:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
+                                    <label>Hole Dia <input type="number" value={svgParams.hdia} onChange={e=>setSvgParams({...svgParams, hdia:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
+                                    <label>Scale <input type="number" value={svgParams.scale} step="0.1" onChange={e=>setSvgParams({...svgParams, scale:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
                                 </div>
-                                <div className="bg-white p-4 flex justify-center">
-                                    <svg id="gen-svg" width="150" height="150" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="100" cy="100" r={svgParams.od/2} stroke="black" strokeWidth="2" fill="none" />
-                                        <circle cx="100" cy="100" r={svgParams.id/2} stroke="black" strokeWidth="2" fill="none" />
-                                        {Array.from({length: svgParams.holes}).map((_,i) => {
-                                            const angle = (i * 360 / svgParams.holes) * (Math.PI/180);
-                                            const r = (svgParams.od - ((svgParams.od-svgParams.id)/2) - (svgParams.id/2)) + (svgParams.id/2); // Midpoint? No, bolt circle usually specified. approximating as middle of flange.
-                                            const bc = (parseFloat(svgParams.od) + parseFloat(svgParams.id)) / 4; // Radius of bolt circle
-                                            const x = 100 + bc * Math.cos(angle);
-                                            const y = 100 + bc * Math.sin(angle);
-                                            return <circle key={i} cx={x} cy={y} r={svgParams.hdia/2} fill="black" />
-                                        })}
+                                <div className="bg-white p-4 flex justify-center overflow-auto">
+                                    <svg id="gen-svg" width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                        <g transform={`scale(${svgParams.scale}) translate(100,100)`}>
+                                            {svgParams.shape === 'FLANGE' && <><circle r={svgParams.od/2} stroke="black" strokeWidth="1" fill="none" /><circle r={svgParams.id/2} stroke="black" strokeWidth="1" fill="none" /></>}
+                                            {svgParams.shape === 'PLATE' && <rect x={-svgParams.w/2} y={-svgParams.h/2} width={svgParams.w} height={svgParams.h} stroke="black" strokeWidth="1" fill="none" />}
+                                            {Array.from({length: svgParams.holes}).map((_,i) => {
+                                                if (svgParams.shape === 'FLANGE') {
+                                                    const angle = (i * 360 / svgParams.holes) * (Math.PI/180);
+                                                    const bc = (parseFloat(svgParams.od) + parseFloat(svgParams.id)) / 4;
+                                                    return <circle key={i} cx={bc * Math.cos(angle)} cy={bc * Math.sin(angle)} r={svgParams.hdia/2} fill="black" />
+                                                } else {
+                                                    // Corners for plate
+                                                    if(i>3) return null;
+                                                    const inset = 10;
+                                                    const x = (i%2===0 ? 1 : -1) * (svgParams.w/2 - inset);
+                                                    const y = (i<2 ? 1 : -1) * (svgParams.h/2 - inset);
+                                                    return <circle key={i} cx={x} cy={y} r={svgParams.hdia/2} fill="black" />
+                                                }
+                                            })}
+                                        </g>
                                     </svg>
                                 </div>
-                                <button onClick={downloadSvg} className="w-full bg-rust py-2 font-bold text-black">DOWNLOAD SVG</button>
+                                <button onClick={()=>downloadSvg('gen-svg', 'manku_shape.svg')} className="w-full bg-rust py-2 font-bold text-black">DOWNLOAD SVG</button>
+                            </div>
+                        )}
+
+                        {mode === 'NOTCHER' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-3 gap-2 text-xs">
+                                    <label>Tube OD <input type="number" value={notchParams.tubeOd} onChange={e=>setNotchParams({...notchParams, tubeOd:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
+                                    <label>Header OD <input type="number" value={notchParams.headerOd} onChange={e=>setNotchParams({...notchParams, headerOd:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
+                                    <label>Angle <input type="number" value={notchParams.angle} onChange={e=>setNotchParams({...notchParams, angle:e.target.value})} className="w-full bg-black border border-metal p-1" /></label>
+                                </div>
+                                <div className="bg-white p-2 overflow-x-auto">
+                                    <svg id="notch-svg" width={Math.PI * notchParams.tubeOd * 3} height={notchParams.tubeOd * 2} viewBox={`0 0 ${Math.PI * notchParams.tubeOd} ${notchParams.tubeOd * 2}`} xmlns="http://www.w3.org/2000/svg">
+                                        <path d={`M0,${notchParams.tubeOd} ` + Array.from({length: 50}).map((_,i) => {
+                                            const x = (i/50) * Math.PI * notchParams.tubeOd;
+                                            // Simplified approximation of a coping curve
+                                            const y = notchParams.tubeOd - (Math.sin((i/50)*Math.PI*2) * (notchParams.tubeOd/2) * Math.sin(notchParams.angle * Math.PI/180));
+                                            return `L${x},${y}`;
+                                        }).join(" ") + ` L${Math.PI * notchParams.tubeOd},${notchParams.tubeOd} L0,${notchParams.tubeOd}`} fill="none" stroke="black" strokeWidth="2" />
+                                        <text x="10" y="20" fontSize="10">WRAP TEMPLATE (1:1 SCALE)</text>
+                                    </svg>
+                                </div>
+                                <button onClick={()=>downloadSvg('notch-svg', 'notch_template.svg')} className="w-full bg-rust py-2 font-bold text-black">DOWNLOAD TEMPLATE</button>
                             </div>
                         )}
 
@@ -366,18 +401,20 @@
 
         // 4. MAIN APP
         const App = () => {
-            const [view, setView] = useState('DASH');
+            const [user, setUser] = useState(null); // null = Visitor
+            const [view, setView] = useState('VISITOR');
             const [hud, setHud] = useState(false);
             const [tools, setTools] = useState(false);
             const [quoteJob, setQuoteJob] = useState(null);
             const [jobDetail, setJobDetail] = useState(null); // Selected Job Object
             const [editJob, setEditJob] = useState(null); // Job Object being edited
             const [showNewJob, setShowNewJob] = useState(false);
+            const [loginOpen, setLoginOpen] = useState(false);
 
             // Showcase State
             const [showcaseFilter, setShowcaseFilter] = useState('ALL');
 
-            const [data, setData] = useState({jobs:[], clients:[], inventory:[], vendors:[], templates:[], showcase:[]});
+            const [data, setData] = useState({jobs:[], clients:[], inventory:[], vendors:[], templates:[], showcase:[], offers:[], settings:{}});
             const [selectedClient, setSelectedClient] = useState(null);
             const [searchTerm, setSearchTerm] = useState("");
 
@@ -390,6 +427,18 @@
             );
 
             // Actions
+            const login = async (e) => {
+                e.preventDefault();
+                const d = new FormData(e.target);
+                const res = await window.mockFetch('/api/login', { method: 'POST', body: JSON.stringify({user:d.get('user'), pass:d.get('pass')}) });
+                if(res.status === 401) alert("Invalid Credentials");
+                else {
+                    const u = await res.json();
+                    setUser(u);
+                    setView(u.role === 'ADMIN' ? 'DASH' : u.role === 'CLIENT' ? 'MY_JOBS' : 'VISITOR');
+                }
+            };
+
             const createJob = async (e) => {
                 e.preventDefault();
                 const d = new FormData(e.target);
@@ -436,11 +485,23 @@
                 const payload = {
                     project: d.get('project'),
                     cost: parseFloat(d.get('cost')),
-                    status: d.get('status')
+                    status: d.get('status'),
+                    materialLog: editJob.materialLog,
+                    expenses: editJob.expenses,
+                    advances: editJob.advances
                 };
                 await window.mockFetch(`/api/jobs/${editJob.id}`, { method: 'PUT', body: JSON.stringify(payload) });
                 setEditJob(null);
                 setJobDetail(null);
+                refreshData();
+            };
+
+            const updateJobDetails = async (type, item) => {
+                const updatedJob = { ...jobDetail };
+                if (!updatedJob[type]) updatedJob[type] = [];
+                updatedJob[type].push(item);
+                await window.mockFetch(`/api/jobs/${updatedJob.id}`, { method: 'PUT', body: JSON.stringify(updatedJob) });
+                setJobDetail(updatedJob);
                 refreshData();
             };
 
@@ -464,16 +525,57 @@
             const totalJobs = data.jobs.length || 1; // avoid divide by zero
 
             return (
-                <div className="min-h-screen p-4 flex flex-col max-w-xl mx-auto pb-20">
+                <div className={`min-h-screen p-4 flex flex-col max-w-xl mx-auto pb-20 ${data.settings?.theme === 'light' ? 'bg-white text-black' : ''}`}>
                     <div className="flex justify-between items-end border-b-4 border-surface pb-4 mb-6 no-print">
                         <div><h1 className="font-stencil text-2xl leading-none">MANKU METAL <span className="text-rust">WORKS</span></h1></div>
                         <div className="flex gap-2">
-                            <button onClick={()=>setTools(true)} className="bg-surface p-2 border border-metal"><Ruler size={16} /></button>
-                            <button onClick={()=>setHud(true)} className="bg-rust text-black p-2 font-bold"><Camera size={16} /></button>
+                            {user && <button onClick={()=>setTools(true)} className="bg-surface p-2 border border-metal"><Ruler size={16} /></button>}
+                            {user && <button onClick={()=>setHud(true)} className="bg-rust text-black p-2 font-bold"><Camera size={16} /></button>}
+                            {!user && <button onClick={()=>setLoginOpen(true)} className="bg-surface border border-metal px-3 py-1 font-bold text-xs">LOGIN</button>}
+                            {user && <button onClick={()=>{setUser(null);setView('VISITOR')}} className="bg-surface border border-metal p-2"><LogOut size={16} /></button>}
                         </div>
                     </div>
 
                     <main className="flex-1 no-print">
+                        {view === 'VISITOR' && (
+                            <div className="space-y-6">
+                                <div className="bg-rust p-4 text-black font-bold text-center">
+                                    <h2 className="font-stencil text-2xl">WELCOME TO MANKU METAL</h2>
+                                    <p className="text-sm">Premium Fabrication Services</p>
+                                </div>
+                                <div className="space-y-4">
+                                    <h3 className="font-stencil text-xl border-b border-surface">CURRENT OFFERS</h3>
+                                    {data.offers && data.offers.map(o => (
+                                        <div key={o.id} className="bg-surface border border-rust p-4">
+                                            <div className="font-bold text-lg text-rust">{o.title}</div>
+                                            <p className="text-sm text-metal">{o.desc}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="space-y-4">
+                                    <h3 className="font-stencil text-xl border-b border-surface">SHOWCASE</h3>
+                                    <div className="columns-2 gap-4 space-y-4">
+                                        {data.showcase && data.showcase.slice(0,4).map(item => (
+                                            <div key={item.id} className="break-inside-avoid bg-surface border border-metal/30">
+                                                <div className="w-full h-24 relative" style={{backgroundColor: item.color}}></div>
+                                                <div className="p-2 text-xs font-bold">{item.title}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button onClick={()=>setView('SHOWCASE')} className="w-full border border-metal py-2 text-xs hover:bg-surface">VIEW FULL GALLERY</button>
+                                </div>
+                                <div className="bg-surface p-4 border border-metal">
+                                    <h3 className="font-bold mb-2">REQUEST APPOINTMENT</h3>
+                                    <form onSubmit={e=>{e.preventDefault(); alert("Request Sent!");}} className="space-y-2">
+                                        <input placeholder="Your Name" className="w-full bg-black border border-metal p-2 text-white" />
+                                        <input placeholder="Phone Number" className="w-full bg-black border border-metal p-2 text-white" />
+                                        <textarea placeholder="Job Description" className="w-full bg-black border border-metal p-2 text-white"></textarea>
+                                        <button className="w-full bg-rust py-2 font-bold text-black">SEND REQUEST</button>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
                         {view === 'DASH' && (
                             <div className="space-y-6">
                                 {/* CASH FLOW */}
@@ -604,6 +706,47 @@
                             </div>
                         )}
 
+                        {view === 'MY_JOBS' && (
+                            <div className="space-y-4">
+                                <h2 className="font-stencil text-xl border-b border-surface pb-2">MY JOBS</h2>
+                                <div className="bg-surface p-4 border border-metal">
+                                    <h3 className="font-bold mb-2 text-xs">ACTIVE ORDERS</h3>
+                                    {data.jobs.filter(j => j.clientId === user?.id).map(j => (
+                                        <div key={j.id} className="mb-4 border-b border-metal/30 pb-4 last:border-0">
+                                            <div className="flex justify-between font-bold"><span>{j.project}</span><span className="text-rust">{j.status}</span></div>
+                                            <div className="text-xs text-metal mt-1">Date: {j.date} | Cost: ₹{j.cost}</div>
+                                            <div className="mt-2 text-xs bg-black/30 p-2">
+                                                <div>Updates: Material Procured</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-surface p-4 border border-metal">
+                                    <h3 className="font-bold mb-2 text-xs">PAYMENT HISTORY</h3>
+                                    <div className="text-center text-metal text-xs py-4">No recent payments</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'SETTINGS' && (
+                            <div className="space-y-4">
+                                <h2 className="font-stencil text-xl border-b border-surface pb-2">SETTINGS</h2>
+                                <div className="bg-surface p-4 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span>Theme Mode</span>
+                                        <button onClick={()=>window.mockFetch('/api/settings', {method:'PUT', body:JSON.stringify({theme: data.settings?.theme==='dark'?'light':'dark'})}).then(refreshData)} className="bg-black border border-metal px-3 py-1 text-xs">
+                                            {data.settings?.theme === 'light' ? 'LIGHT' : 'DARK'}
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold">WhatsApp Blurb</label>
+                                        <textarea className="w-full bg-black border border-metal p-2 text-white text-xs" defaultValue={data.settings?.whatsappBlurb}></textarea>
+                                        <button className="w-full bg-rust text-black text-xs font-bold py-2">UPDATE</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {view === 'INV' && (
                             <div className="space-y-4">
                                 <div className="bg-surface p-4 border border-metal">
@@ -667,7 +810,7 @@
 
                     {jobDetail && (
                         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-                            <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative">
+                            <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
                                 <button onClick={()=>setJobDetail(null)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
                                 <div className="mb-6">
                                     <span onClick={()=>updateStatus(jobDetail, jobDetail.status==='PENDING'?'ACTIVE':jobDetail.status==='ACTIVE'?'DONE':'PENDING')} className="bg-rust text-black px-2 py-1 text-xs font-bold cursor-pointer hover:bg-white">{jobDetail.status}</span>
@@ -686,6 +829,43 @@
                                     <div className="flex justify-between border-b border-metal/30 pb-2">
                                         <span className="text-metal">EST. COST</span>
                                         <span className="font-bold text-right font-mono text-green-500">₹{jobDetail.cost}</span>
+                                    </div>
+
+                                    {/* Material Log */}
+                                    <div className="border-t border-metal/30 pt-4">
+                                        <h4 className="font-bold text-xs mb-2">MATERIAL CONSUMPTION</h4>
+                                        <div className="space-y-1 mb-2">
+                                            {jobDetail.materialLog && jobDetail.materialLog.map((m, i) => (
+                                                <div key={i} className="text-xs flex justify-between"><span>{m.item}</span><span>{m.qty}</span></div>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <select id="mat-select" className="bg-black border border-metal text-white text-xs w-2/3">
+                                                {data.inventory.map(i => <option key={i.id} value={i.item}>{i.item}</option>)}
+                                            </select>
+                                            <input id="mat-qty" placeholder="Qty" className="bg-black border border-metal text-white text-xs w-1/3" />
+                                            <button onClick={()=>{
+                                                const item = document.getElementById('mat-select').value;
+                                                const qty = document.getElementById('mat-qty').value;
+                                                if(qty) updateJobDetails('materialLog', {item, qty});
+                                            }} className="bg-rust text-black px-2 font-bold">+</button>
+                                        </div>
+                                    </div>
+
+                                    {/* Financials */}
+                                    <div className="border-t border-metal/30 pt-4">
+                                        <h4 className="font-bold text-xs mb-2">FINANCIALS</h4>
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span>Advances</span>
+                                            <span>₹{jobDetail.advances ? jobDetail.advances.reduce((a,b)=>a+parseInt(b.amount),0) : 0}</span>
+                                        </div>
+                                        <div className="flex gap-2 mb-2">
+                                            <input id="adv-amt" placeholder="Advance Amount" className="bg-black border border-metal text-white text-xs w-2/3" />
+                                            <button onClick={()=>{
+                                                const amount = document.getElementById('adv-amt').value;
+                                                if(amount) updateJobDetails('advances', {amount, date: new Date().toISOString().split('T')[0]});
+                                            }} className="bg-rust text-black px-2 font-bold text-xs">ADD</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <button onClick={()=>saveTemplate(jobDetail)} className="w-full bg-black border border-rust text-rust py-2 mb-4 hover:bg-rust hover:text-black">SAVE AS TEMPLATE</button>
@@ -748,11 +928,32 @@
                     )}
 
                     <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t-2 border-rust p-4 flex justify-around no-print">
-                        <button onClick={()=>setView('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>
-                        <button onClick={()=>setView('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>
-                        <button onClick={()=>setView('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>
+                        {user?.role === 'ADMIN' && <button onClick={()=>setView('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>}
+                        {user?.role === 'ADMIN' && <button onClick={()=>setView('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>}
+                        {user?.role === 'ADMIN' && <button onClick={()=>setView('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>}
                         <button onClick={()=>setView('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal'}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></button>
+                        {user?.role === 'CLIENT' && <button onClick={()=>setView('MY_JOBS')} className={view==='MY_JOBS'?'text-rust':'text-metal'}><Activity /></button>}
+                        {user && <button onClick={()=>setView('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal'}><Settings /></button>}
+                        {!user && <button onClick={()=>setView('VISITOR')} className={view==='VISITOR'?'text-rust':'text-metal'}><Activity /></button>}
                     </nav>
+
+                    {loginOpen && (
+                        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+                            <div className="bg-surface border-2 border-rust w-full max-w-sm p-6 relative">
+                                <button onClick={()=>setLoginOpen(false)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
+                                <h2 className="font-stencil text-2xl text-rust mb-4">LOGIN</h2>
+                                <form onSubmit={(e)=>{login(e); setLoginOpen(false);}} className="space-y-4">
+                                    <input name="user" placeholder="Username / Phone" required className="w-full bg-black border border-metal p-2 text-white" />
+                                    <input name="pass" type="password" placeholder="Password" required className="w-full bg-black border border-metal p-2 text-white" />
+                                    <button className="w-full bg-rust py-3 font-bold text-black">ACCESS PORTAL</button>
+                                </form>
+                                <div className="text-center text-xs text-metal mt-4">
+                                    <p>Admin: admin / admin</p>
+                                    <p>Client: 919999999999 / 123</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {hud && <FabricatorHUD onClose={()=>setHud(false)} />}
                     {tools && <ToolsModal onClose={()=>setTools(false)} />}
