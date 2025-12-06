@@ -18,16 +18,97 @@
             {id:"I-3", item:"Angle Iron 2x2", stock:20, unit:"ft", usage: 12},
             {id:"I-4", item:"Welding Rods", stock:5, unit:"box", usage: 50}
         ],
+        vendors: [
+            {id:"V-1", name:"Steel City Suppliers", contact:"Vikram", phone:"9988776655", material:"MS/SS Sheets"},
+            {id:"V-2", name:"Pune Industrial Gas", contact:"Rahul", phone:"8877665544", material:"Argon/CO2"}
+        ],
         templates: [{id:"T-1", name:"Standard Gate", parts:[{id:"I-1", qty:2}]}]
     };
 
+    // Helper to persist to localStorage if needed, for now just in-memory of the iframe instance
+    // Note: Since this is injected every reload, persistence isn't real unless we use localStorage.
+    // Let's add basic localStorage support for demo persistence.
+    const loadData = () => {
+        const stored = localStorage.getItem('mmw_db');
+        return stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(SEED));
+    };
+
+    let DB = loadData();
+
+    const saveData = () => {
+        localStorage.setItem('mmw_db', JSON.stringify(DB));
+    };
+
     window.mockFetch = async (url, opts) => {
-        console.log("[MOCK]", opts?.method || "GET", url);
+        console.log("[MOCK]", opts?.method || "GET", url, opts?.body);
         await new Promise(r => setTimeout(r, 200));
 
-        // Simple router
-        if (url === '/api/init') return { json: async () => SEED };
+        const method = opts?.method || "GET";
+        const body = opts?.body ? JSON.parse(opts.body) : {};
 
-        return { json: async () => SEED };
+        // API ROUTER
+
+        // GET ALL
+        if (url === '/api/init' && method === 'GET') {
+            return { json: async () => DB };
+        }
+
+        // --- JOBS ---
+        if (url === '/api/jobs' && method === 'POST') {
+            const newJob = { ...body, id: `J-${Date.now()}` };
+            DB.jobs.unshift(newJob);
+            saveData();
+            return { json: async () => newJob };
+        }
+        if (url.startsWith('/api/jobs/') && method === 'PUT') {
+            const id = url.split('/').pop();
+            const idx = DB.jobs.findIndex(j => j.id === id);
+            if (idx > -1) {
+                DB.jobs[idx] = { ...DB.jobs[idx], ...body };
+                saveData();
+                return { json: async () => DB.jobs[idx] };
+            }
+        }
+        if (url.startsWith('/api/jobs/') && method === 'DELETE') {
+            const id = url.split('/').pop();
+            DB.jobs = DB.jobs.filter(j => j.id !== id);
+            saveData();
+            return { json: async () => ({success:true}) };
+        }
+
+        // --- CLIENTS ---
+        if (url === '/api/clients' && method === 'POST') {
+            const newClient = { ...body, id: `C-${Date.now()}`, history:[] };
+            DB.clients.unshift(newClient);
+            saveData();
+            return { json: async () => newClient };
+        }
+
+        // --- INVENTORY ---
+        if (url === '/api/inventory' && method === 'POST') {
+            const newItem = { ...body, id: `I-${Date.now()}`, usage:0 };
+            DB.inventory.push(newItem);
+            saveData();
+            return { json: async () => newItem };
+        }
+        if (url.startsWith('/api/inventory/') && method === 'PUT') {
+            const id = url.split('/').pop();
+            const idx = DB.inventory.findIndex(i => i.id === id);
+            if (idx > -1) {
+                DB.inventory[idx] = { ...DB.inventory[idx], ...body };
+                saveData();
+                return { json: async () => DB.inventory[idx] };
+            }
+        }
+
+        // --- VENDORS ---
+        if (url === '/api/vendors' && method === 'POST') {
+            const newVendor = { ...body, id: `V-${Date.now()}` };
+            DB.vendors.push(newVendor);
+            saveData();
+            return { json: async () => newVendor };
+        }
+
+        return { json: async () => DB };
     };
 })();
