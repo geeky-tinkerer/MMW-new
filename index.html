@@ -374,7 +374,10 @@
             const [editJob, setEditJob] = useState(null); // Job Object being edited
             const [showNewJob, setShowNewJob] = useState(false);
 
-            const [data, setData] = useState({jobs:[], clients:[], inventory:[], vendors:[]});
+            // Showcase State
+            const [showcaseFilter, setShowcaseFilter] = useState('ALL');
+
+            const [data, setData] = useState({jobs:[], clients:[], inventory:[], vendors:[], templates:[], showcase:[]});
             const [selectedClient, setSelectedClient] = useState(null);
             const [searchTerm, setSearchTerm] = useState("");
 
@@ -399,6 +402,13 @@
                 };
                 await window.mockFetch('/api/jobs', { method: 'POST', body: JSON.stringify(payload) });
                 setShowNewJob(false);
+                refreshData();
+            };
+
+            const saveTemplate = async (job) => {
+                const payload = { name: job.project + " (Template)", project: job.project, cost: job.cost };
+                await window.mockFetch('/api/templates', { method: 'POST', body: JSON.stringify(payload) });
+                alert("Template Saved!");
                 refreshData();
             };
 
@@ -569,6 +579,31 @@
                             </div>
                         )}
 
+                        {view === 'SHOWCASE' && (
+                            <div className="space-y-4">
+                                <div className="flex gap-2 overflow-x-auto pb-2">
+                                    {['ALL', 'Gate', 'Grill', 'Industrial'].map(tag => (
+                                        <button key={tag} onClick={()=>setShowcaseFilter(tag)} className={`px-3 py-1 text-xs font-bold whitespace-nowrap ${showcaseFilter===tag?'bg-rust text-black':'bg-surface border border-metal'}`}>{tag}</button>
+                                    ))}
+                                </div>
+                                <div className="columns-2 gap-4 space-y-4">
+                                    {data.showcase
+                                        .filter(i => showcaseFilter === 'ALL' || i.tag === showcaseFilter)
+                                        .map(item => (
+                                        <div key={item.id} className="break-inside-avoid bg-surface border border-metal/30 hover:border-rust transition-colors">
+                                            <div className="w-full h-32 relative" style={{backgroundColor: item.color}}>
+                                                <div className="absolute inset-0 flex items-center justify-center opacity-20 font-stencil text-4xl text-black">IMG</div>
+                                            </div>
+                                            <div className="p-2">
+                                                <h3 className="font-bold text-sm">{item.title}</h3>
+                                                <span className="text-[10px] bg-black px-1 text-metal">{item.tag}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {view === 'INV' && (
                             <div className="space-y-4">
                                 <div className="bg-surface p-4 border border-metal">
@@ -653,6 +688,7 @@
                                         <span className="font-bold text-right font-mono text-green-500">₹{jobDetail.cost}</span>
                                     </div>
                                 </div>
+                                <button onClick={()=>saveTemplate(jobDetail)} className="w-full bg-black border border-rust text-rust py-2 mb-4 hover:bg-rust hover:text-black">SAVE AS TEMPLATE</button>
                                 <div className="flex gap-2">
                                     <button onClick={()=>{setEditJob(jobDetail)}} className="flex-1 bg-surface border border-metal text-white py-3 hover:bg-black">EDIT</button>
                                     <button onClick={()=>{setQuoteJob(jobDetail); setJobDetail(null)}} className="flex-1 bg-white text-black font-bold py-3 hover:bg-gray-200">QUOTE</button>
@@ -689,6 +725,16 @@
                                 <button onClick={()=>setShowNewJob(false)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
                                 <h2 className="font-stencil text-2xl text-rust mb-4">NEW JOB</h2>
                                 <form onSubmit={createJob} className="space-y-3">
+                                    <select onChange={e=>{
+                                        const t = data.templates.find(t=>t.id===e.target.value);
+                                        if(t) {
+                                            document.getElementsByName('project')[0].value = t.project;
+                                            document.getElementsByName('cost')[0].value = t.cost;
+                                        }
+                                    }} className="w-full bg-black border border-metal p-2 text-white mb-4">
+                                        <option value="">Load Template...</option>
+                                        {data.templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                    </select>
                                     <input name="project" placeholder="Project Name" required className="w-full bg-black border border-metal p-2 text-white" />
                                     <select name="client" required className="w-full bg-black border border-metal p-2 text-white">
                                         <option value="">Select Client...</option>
@@ -705,6 +751,7 @@
                         <button onClick={()=>setView('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>
                         <button onClick={()=>setView('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>
                         <button onClick={()=>setView('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>
+                        <button onClick={()=>setView('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal'}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></button>
                     </nav>
 
                     {hud && <FabricatorHUD onClose={()=>setHud(false)} />}

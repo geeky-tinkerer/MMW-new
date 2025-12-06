@@ -22,12 +22,19 @@
             {id:"V-1", name:"Steel City Suppliers", contact:"Vikram", phone:"9988776655", material:"MS/SS Sheets"},
             {id:"V-2", name:"Pune Industrial Gas", contact:"Rahul", phone:"8877665544", material:"Argon/CO2"}
         ],
-        templates: [{id:"T-1", name:"Standard Gate", parts:[{id:"I-1", qty:2}]}]
+        templates: [
+            {id:"T-1", name:"Standard Gate", project:"Standard Gate", cost:25000},
+            {id:"T-2", name:"Window Grill (4x4)", project:"Window Grill 4x4", cost:4000}
+        ],
+        showcase: [
+            {id:"S-1", title:"Luxury Gate", tag:"Gate", color:"#1e293b"},
+            {id:"S-2", title:"Heavy Duty Grill", tag:"Grill", color:"#334155"},
+            {id:"S-3", title:"Industrial Rack", tag:"Industrial", color:"#475569"},
+            {id:"S-4", title:"Garden Gate", tag:"Gate", color:"#0f172a"},
+            {id:"S-5", title:"Balcony Railing", tag:"Grill", color:"#1e293b"}
+        ]
     };
 
-    // Helper to persist to localStorage if needed, for now just in-memory of the iframe instance
-    // Note: Since this is injected every reload, persistence isn't real unless we use localStorage.
-    // Let's add basic localStorage support for demo persistence.
     const loadData = () => {
         const stored = localStorage.getItem('mmw_db');
         return stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(SEED));
@@ -107,6 +114,14 @@
             DB.vendors.push(newVendor);
             saveData();
             return { json: async () => newVendor };
+        }
+
+        // --- TEMPLATES ---
+        if (url === '/api/templates' && method === 'POST') {
+            const newTemplate = { ...body, id: `T-${Date.now()}` };
+            DB.templates.push(newTemplate);
+            saveData();
+            return { json: async () => newTemplate };
         }
 
         return { json: async () => DB };
