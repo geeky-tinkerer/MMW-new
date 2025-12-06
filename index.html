@@ -221,31 +221,49 @@
         };
 
         // 3. QUOTE GENERATOR (A4 Layout)
-        const QuoteModal = ({ job, onClose }) => (
-            <div className="fixed inset-0 z-[100] bg-white text-black p-8 overflow-y-auto font-sans">
-                <div className="max-w-[210mm] mx-auto min-h-[297mm] relative">
-                    <button onClick={onClose} className="no-print absolute top-0 right-0 bg-black text-white px-4 py-2 font-bold">CLOSE</button>
-                    <button onClick={()=>window.print()} className="no-print absolute top-0 right-24 bg-blue-600 text-white px-4 py-2 font-bold">PRINT PDF</button>
+        const QuoteModal = ({ job, onClose }) => {
+            // Mock split for Material/Labor
+            const materialCost = Math.round(job.cost * 0.7);
+            const laborCost = job.cost - materialCost;
 
-                    <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-8">
-                        <div><h1 className="text-4xl font-black">MANKU METAL</h1><p>Pune, MH | +91-9999999999</p></div>
-                        <div className="text-right"><h2 className="text-2xl font-bold text-gray-400">ESTIMATE</h2><p>#{job.id}</p></div>
+            return (
+                <div className="fixed inset-0 z-[100] bg-white text-black p-8 overflow-y-auto font-sans">
+                    <div className="max-w-[210mm] mx-auto min-h-[297mm] relative flex flex-col justify-between">
+                        <div>
+                            <button onClick={onClose} className="no-print absolute top-0 right-0 bg-black text-white px-4 py-2 font-bold">CLOSE</button>
+                            <button onClick={()=>window.print()} className="no-print absolute top-0 right-24 bg-blue-600 text-white px-4 py-2 font-bold">PRINT PDF</button>
+
+                            <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-8">
+                                <div><h1 className="text-4xl font-black font-stencil">MANKU METAL</h1><p>Pune, MH | +91-9999999999</p></div>
+                                <div className="text-right"><h2 className="text-2xl font-bold text-gray-400">ESTIMATE</h2><p>#{job.id}</p><p>{job.date}</p></div>
+                            </div>
+                            <div className="mb-8">
+                                <h3 className="font-bold text-sm uppercase text-gray-500">BILL TO</h3>
+                                <p className="text-xl font-bold">{job.client}</p>
+                                <p>{job.project}</p>
+                            </div>
+                            <table className="w-full mb-8">
+                                <thead><tr className="border-b border-black"><th className="text-left py-2">DESCRIPTION</th><th className="text-right">AMOUNT</th></tr></thead>
+                                <tbody>
+                                    <tr className="border-b border-gray-200"><td className="py-4">Material Costs (Steel, Consumables)</td><td className="text-right font-mono">₹{materialCost}</td></tr>
+                                    <tr className="border-b border-gray-200"><td className="py-4">Fabrication Labor & Overhead</td><td className="text-right font-mono">₹{laborCost}</td></tr>
+                                </tbody>
+                            </table>
+                            <div className="text-right text-2xl font-bold border-t-2 border-black pt-4">TOTAL: ₹{job.cost}</div>
+                        </div>
+
+                        <div className="border-t border-gray-300 pt-8 mt-8">
+                            <h4 className="font-bold mb-2">BANK DETAILS</h4>
+                            <p>Bank: HDFC Bank</p>
+                            <p>Acct Name: MANKU METAL WORKS</p>
+                            <p>Acct No: 50200012345678</p>
+                            <p>IFSC: HDFC0001234</p>
+                            <p className="mt-4 text-sm text-gray-500 text-center">This is a computer generated estimate.</p>
+                        </div>
                     </div>
-                    <div className="mb-8">
-                        <h3 className="font-bold text-sm uppercase text-gray-500">BILL TO</h3>
-                        <p className="text-xl font-bold">{job.client}</p>
-                        <p>{job.project}</p>
-                    </div>
-                    <table className="w-full mb-8">
-                        <thead><tr className="border-b border-black"><th className="text-left py-2">DESCRIPTION</th><th className="text-right">AMOUNT</th></tr></thead>
-                        <tbody>
-                            <tr className="border-b border-gray-200"><td className="py-4">Fabrication Services & Material</td><td className="text-right font-mono">{job.cost}</td></tr>
-                        </tbody>
-                    </table>
-                    <div className="text-right text-2xl font-bold border-t-2 border-black pt-4">TOTAL: ₹{job.cost}</div>
                 </div>
-            </div>
-        );
+            );
+        };
 
         // 4. MAIN APP
         const App = () => {
@@ -253,10 +271,17 @@
             const [hud, setHud] = useState(false);
             const [tools, setTools] = useState(false);
             const [quoteJob, setQuoteJob] = useState(null);
+            const [jobDetail, setJobDetail] = useState(null);
             const [data, setData] = useState({jobs:[], clients:[]});
             const [selectedClient, setSelectedClient] = useState(null);
+            const [searchTerm, setSearchTerm] = useState("");
 
             useEffect(() => { window.mockFetch().then(r => r.json()).then(setData) }, []);
+
+            const filteredClients = data.clients.filter(c =>
+                c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                c.company.toLowerCase().includes(searchTerm.toLowerCase())
+            );
 
             return (
                 <div className="min-h-screen p-4 flex flex-col max-w-xl mx-auto pb-20">
@@ -283,20 +308,20 @@
                                 </div>
                                 <h2 className="font-stencil text-xl mt-6 border-b border-surface pb-2">ACTIVE JOBS</h2>
                                 {data.jobs.map(j => (
-                                    <div key={j.id} className="bg-surface p-4 border border-surface hover:border-rust transition-colors group relative">
+                                    <div key={j.id} onClick={()=>setJobDetail(j)} className="bg-surface p-4 border border-surface hover:border-rust transition-colors group relative cursor-pointer">
                                         <div className="flex justify-between">
                                             <h3 className="font-bold">{j.project}</h3>
                                             <span className="text-xs bg-black px-2 py-1 text-rust">{j.status}</span>
                                         </div>
                                         <p className="text-xs text-metal mt-1">{j.client}</p>
-                                        <button onClick={()=>setQuoteJob(j)} className="mt-3 text-[10px] border border-metal px-2 py-1 hover:bg-white hover:text-black">GENERATE QUOTE</button>
                                     </div>
                                 ))}
                             </div>
                         )}
                         {view === 'CLIENTS' && (
                             <div className="space-y-4">
-                                {data.clients.map(c => (
+                                <input placeholder="Search Clients..." className="w-full bg-surface border border-metal p-3 text-white focus:border-rust outline-none" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                                {filteredClients.map(c => (
                                     <div key={c.id} className="bg-surface p-4 cursor-pointer hover:bg-surface/80" onClick={()=>setSelectedClient(c)}>
                                         <div className="font-bold text-lg">{c.company}</div>
                                         <div className="text-xs text-metal">{c.name} | {c.phone}</div>
@@ -329,6 +354,34 @@
                                         );
                                     })}
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {jobDetail && (
+                        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+                            <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative">
+                                <button onClick={()=>setJobDetail(null)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
+                                <div className="mb-6">
+                                    <span className="bg-rust text-black px-2 py-1 text-xs font-bold">{jobDetail.status}</span>
+                                    <h2 className="font-stencil text-3xl mt-2">{jobDetail.project}</h2>
+                                    <p className="text-metal">#{jobDetail.id}</p>
+                                </div>
+                                <div className="space-y-4 mb-8">
+                                    <div className="flex justify-between border-b border-metal/30 pb-2">
+                                        <span className="text-metal">CLIENT</span>
+                                        <span className="font-bold text-right">{jobDetail.client}</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-metal/30 pb-2">
+                                        <span className="text-metal">DATE</span>
+                                        <span className="font-bold text-right">{jobDetail.date}</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-metal/30 pb-2">
+                                        <span className="text-metal">EST. COST</span>
+                                        <span className="font-bold text-right font-mono text-green-500">₹{jobDetail.cost}</span>
+                                    </div>
+                                </div>
+                                <button onClick={()=>{setQuoteJob(jobDetail); setJobDetail(null)}} className="w-full bg-white text-black font-bold py-3 hover:bg-gray-200">PRINT QUOTE / ESTIMATE</button>
                             </div>
                         </div>
                     )}
