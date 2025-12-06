@@ -61,14 +61,25 @@
             const [zoom, setZoom] = useState(50);
             const [tilt, setTilt] = useState(0);
             const videoRef = useRef(null);
+            const streamRef = useRef(null);
 
             useEffect(() => {
                 const handleOr = (e) => setTilt(e.gamma || 0);
                 window.addEventListener('deviceorientation', handleOr);
+
                 navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
-                    .then(s => { if(videoRef.current) videoRef.current.srcObject = s; })
+                    .then(s => {
+                        streamRef.current = s;
+                        if(videoRef.current) videoRef.current.srcObject = s;
+                    })
                     .catch(e => console.log("Cam Error (Expected in iframe)", e));
-                return () => window.removeEventListener('deviceorientation', handleOr);
+
+                return () => {
+                    window.removeEventListener('deviceorientation', handleOr);
+                    if(streamRef.current) {
+                        streamRef.current.getTracks().forEach(track => track.stop());
+                    }
+                };
             }, []);
 
             const isLevel = Math.abs(tilt) <= 1;
