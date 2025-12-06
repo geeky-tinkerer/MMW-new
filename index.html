@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1c1917">
+    <title>Manku Metal Works - SECURE OPS</title>
+
+    <!-- LIBRARIES (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>window.react = window.React;</script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide-react@0.556.0/dist/umd/lucide-react.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Black+Ops+One&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+
+    <script>
+        // THEME CONFIG
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { stencil: ["'Black Ops One'", 'cursive'], mono: ["'Courier Prime'", 'monospace'] },
+                    colors: {
+                        rust: 'var(--color-primary)',
+                        oil: 'var(--color-bg)',
+                        metal: 'var(--color-text-dim)',
+                        surface: 'var(--color-surface)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --color-primary: #c2410c; --color-bg: #1c1917; --color-surface: #292524; --color-text-main: #f5f5f4; --color-text-dim: #a8a29e;
+            --bg-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'%3E%3C/svg%3E");
+        }
+        body { background-color: var(--color-bg); background-image: var(--bg-texture); color: var(--color-text-main); font-family: 'Courier Prime', monospace; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        @media print {
+            body { background: white !important; color: black !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+        }
+        .print-only { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- MOCK ADAPTER (Internal Logic for Demo) -->
+    <script>
+        (function() {
+            const SEED = {
+                jobs: [{id:"J-101", client:"Tata Motors", project:"Chassis Bracket", status:"PENDING", cost:15000, date:"2023-10-01"}],
+                clients: [{id:"C-1", name:"Ramesh Engineer", company:"Tata Motors", phone:"9999999999", history:[{id:"J-99", project:"Old Job", date:"2022"}]}],
+                inventory: [{id:"I-1", item:"MS Sheet 2mm", stock:15, unit:"sheet"}],
+                templates: [{id:"T-1", name:"Standard Gate", parts:[{id:"I-1", qty:2}]}]
+            };
+            window.mockFetch = async (url, opts) => {
+                console.log("[MOCK]", opts?.method || "GET");
+                await new Promise(r => setTimeout(r, 200));
+                return { json: async () => SEED };
+            };
+        })();
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users } = LucideReact;
+
+        // 1. FABRICATOR HUD (Camera + Horizon + Grid)
+        const FabricatorHUD = ({ onClose }) => {
+            const [zoom, setZoom] = useState(50);
+            const [tilt, setTilt] = useState(0);
+            const videoRef = useRef(null);
+
+            useEffect(() => {
+                const handleOr = (e) => setTilt(e.gamma || 0);
+                window.addEventListener('deviceorientation', handleOr);
+                navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
+                    .then(s => { if(videoRef.current) videoRef.current.srcObject = s; })
+                    .catch(e => console.log("Cam Error (Expected in iframe)", e));
+                return () => window.removeEventListener('deviceorientation', handleOr);
+            }, []);
+
+            return (
+                <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+                    <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover opacity-70" />
+                    <div className="absolute inset-0 pointer-events-none opacity-40"
+                         style={{backgroundImage: `linear-gradient(to right, #00ff00 1px, transparent 1px), linear-gradient(to bottom, #00ff00 1px, transparent 1px)`, backgroundSize: `${zoom}px ${zoom}px`}}></div>
+                    <div className="absolute w-[120%] h-0.5 bg-red-500 shadow-[0_0_10px_red] transition-transform duration-100" style={{transform: `rotate(${tilt}deg)`}}></div>
+                    <div className="absolute w-8 h-8 border-2 border-red-500 rounded-full flex items-center justify-center"><div className="w-1 h-1 bg-red-500"></div></div>
+                    <div className="absolute bottom-10 flex flex-col items-center w-full gap-4 z-50">
+                        <span className="bg-black/50 text-green-500 text-xs px-2">GRID: {zoom}mm | TILT: {Math.round(tilt)}°</span>
+                        <input type="range" min="20" max="150" value={zoom} onChange={e=>setZoom(e.target.value)} className="w-64 accent-green-500" />
+                        <button onClick={onClose} className="bg-red-600 text-white font-bold px-6 py-3 rounded-full">EXIT HUD</button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. TOOLS MODAL (Pie Cut, Triangle)
+        const ToolsModal = ({ onClose }) => {
+            const [mode, setMode] = useState('PIE');
+            const [res, setRes] = useState(null);
+            const calcPie = (e) => {
+                e.preventDefault();
+                const d = new FormData(e.target);
+                const angle = d.get('angle') / (d.get('seg') * 2);
+                setRes(`CUT ANGLE: ${angle.toFixed(1)}°`);
+            };
+            return (
+                <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+                    <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative">
+                        <button onClick={onClose} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
+                        <h2 className="font-stencil text-2xl text-rust mb-4">FABRICATOR SUITE</h2>
+                        <div className="flex gap-2 mb-4">
+                            {['PIE', 'TRIANGLE'].map(m => <button key={m} onClick={()=>setMode(m)} className={`px-2 py-1 text-xs font-bold ${mode===m?'bg-rust text-black':'bg-surface border border-metal'}`}>{m}</button>)}
+                        </div>
+                        {mode === 'PIE' && (
+                            <form onSubmit={calcPie} className="space-y-3">
+                                <input name="dia" placeholder="Pipe Dia (OD)" className="w-full bg-black border border-metal p-2" />
+                                <input name="angle" placeholder="Bend Angle (Total)" className="w-full bg-black border border-metal p-2" />
+                                <input name="seg" placeholder="Segments" className="w-full bg-black border border-metal p-2" />
+                                <button className="w-full bg-rust py-2 font-bold text-black">CALCULATE</button>
+                            </form>
+                        )}
+                        {res && <div className="mt-4 p-4 border border-green-500 text-green-500 font-mono text-center text-xl animate-pulse">{res}</div>}
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. QUOTE GENERATOR (A4 Layout)
+        const QuoteModal = ({ job, onClose }) => (
+            <div className="fixed inset-0 z-[100] bg-white text-black p-8 overflow-y-auto font-sans">
+                <div className="max-w-[210mm] mx-auto min-h-[297mm] relative">
+                    <button onClick={onClose} className="no-print absolute top-0 right-0 bg-black text-white px-4 py-2 font-bold">CLOSE</button>
+                    <button onClick={()=>window.print()} className="no-print absolute top-0 right-24 bg-blue-600 text-white px-4 py-2 font-bold">PRINT PDF</button>
+
+                    <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-8">
+                        <div><h1 className="text-4xl font-black">MANKU METAL</h1><p>Pune, MH | +91-9999999999</p></div>
+                        <div className="text-right"><h2 className="text-2xl font-bold text-gray-400">ESTIMATE</h2><p>#{job.id}</p></div>
+                    </div>
+                    <div className="mb-8">
+                        <h3 className="font-bold text-sm uppercase text-gray-500">BILL TO</h3>
+                        <p className="text-xl font-bold">{job.client}</p>
+                        <p>{job.project}</p>
+                    </div>
+                    <table className="w-full mb-8">
+                        <thead><tr className="border-b border-black"><th className="text-left py-2">DESCRIPTION</th><th className="text-right">AMOUNT</th></tr></thead>
+                        <tbody>
+                            <tr className="border-b border-gray-200"><td className="py-4">Fabrication Services & Material</td><td className="text-right font-mono">{job.cost}</td></tr>
+                        </tbody>
+                    </table>
+                    <div className="text-right text-2xl font-bold border-t-2 border-black pt-4">TOTAL: ₹{job.cost}</div>
+                </div>
+            </div>
+        );
+
+        // 4. MAIN APP
+        const App = () => {
+            const [view, setView] = useState('DASH');
+            const [hud, setHud] = useState(false);
+            const [tools, setTools] = useState(false);
+            const [quoteJob, setQuoteJob] = useState(null);
+            const [data, setData] = useState({jobs:[], clients:[]});
+
+            useEffect(() => { window.mockFetch().then(r => r.json()).then(setData) }, []);
+
+            return (
+                <div className="min-h-screen p-4 flex flex-col max-w-xl mx-auto pb-20">
+                    <div className="flex justify-between items-end border-b-4 border-surface pb-4 mb-6 no-print">
+                        <div><h1 className="font-stencil text-4xl leading-none">MANKU<span className="text-rust">OPS</span></h1></div>
+                        <div className="flex gap-2">
+                            <button onClick={()=>setTools(true)} className="bg-surface p-2 border border-metal"><Ruler size={16} /></button>
+                            <button onClick={()=>setHud(true)} className="bg-rust text-black p-2 font-bold"><Camera size={16} /></button>
+                        </div>
+                    </div>
+
+                    <main className="flex-1 no-print">
+                        {view === 'DASH' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-surface p-4 border-l-4 border-green-600">
+                                        <div className="text-xs text-metal">INCOME</div>
+                                        <div className="text-2xl font-mono font-bold text-green-500">₹4.5L</div>
+                                    </div>
+                                    <div className="bg-surface p-4 border-l-4 border-red-600">
+                                        <div className="text-xs text-metal">EXPENSE</div>
+                                        <div className="text-2xl font-mono font-bold text-red-500">₹1.2L</div>
+                                    </div>
+                                </div>
+                                <h2 className="font-stencil text-xl mt-6 border-b border-surface pb-2">ACTIVE JOBS</h2>
+                                {data.jobs.map(j => (
+                                    <div key={j.id} className="bg-surface p-4 border border-surface hover:border-rust transition-colors group relative">
+                                        <div className="flex justify-between">
+                                            <h3 className="font-bold">{j.project}</h3>
+                                            <span className="text-xs bg-black px-2 py-1 text-rust">{j.status}</span>
+                                        </div>
+                                        <p className="text-xs text-metal mt-1">{j.client}</p>
+                                        <button onClick={()=>setQuoteJob(j)} className="mt-3 text-[10px] border border-metal px-2 py-1 hover:bg-white hover:text-black">GENERATE QUOTE</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {view === 'CLIENTS' && (
+                            <div className="space-y-4">
+                                {data.clients.map(c => (
+                                    <div key={c.id} className="bg-surface p-4">
+                                        <div className="font-bold text-lg">{c.company}</div>
+                                        <div className="text-xs text-metal">{c.name} | {c.phone}</div>
+                                        <div className="mt-2 pt-2 border-t border-black/20 text-xs">HISTORY: {c.history.length} JOBS</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {view === 'INV' && <div className="p-8 text-center text-metal font-stencil">INVENTORY MODULE LOADING...</div>}
+                    </main>
+
+                    <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t-2 border-rust p-4 flex justify-around no-print">
+                        <button onClick={()=>setView('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>
+                        <button onClick={()=>setView('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>
+                        <button onClick={()=>setView('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>
+                    </nav>
+
+                    {hud && <FabricatorHUD onClose={()=>setHud(false)} />}
+                    {tools && <ToolsModal onClose={()=>setTools(false)} />}
+                    {quoteJob && <QuoteModal job={quoteJob} onClose={()=>setQuoteJob(null)} />}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
