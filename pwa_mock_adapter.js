@@ -27,18 +27,19 @@
             {id:"T-2", name:"Window Grill (4x4)", project:"Window Grill 4x4", cost:4000}
         ],
         showcase: [
-            {id:"S-1", title:"Luxury Gate", tag:"Gate", color:"#1e293b"},
-            {id:"S-2", title:"Heavy Duty Grill", tag:"Grill", color:"#334155"},
-            {id:"S-3", title:"Industrial Rack", tag:"Industrial", color:"#475569"},
-            {id:"S-4", title:"Garden Gate", tag:"Gate", color:"#0f172a"},
-            {id:"S-5", title:"Balcony Railing", tag:"Grill", color:"#1e293b"}
+            {id:"S-1", title:"Luxury Gate", tag:"Gate", img:"https://placehold.co/600x400/1e293b/FFF?text=Luxury+Gate"},
+            {id:"S-2", title:"Heavy Duty Grill", tag:"Grill", img:"https://placehold.co/600x400/334155/FFF?text=Grill"},
+            {id:"S-3", title:"Industrial Rack", tag:"Industrial", img:"https://placehold.co/600x400/475569/FFF?text=Industrial+Rack"},
+            {id:"S-4", title:"Garden Gate", tag:"Gate", img:"https://placehold.co/600x400/0f172a/FFF?text=Garden+Gate"},
+            {id:"S-5", title:"Balcony Railing", tag:"Grill", img:"https://placehold.co/600x400/1e293b/FFF?text=Railing"}
         ],
         offers: [
             {id:"O-1", title:"Monsoon Sale", desc:"10% off on Gate Fabrication"},
-            {id:"O-2", title:"Free Design", desc:"Free CAD Design for orders > 50k"}
+            {id:"O-2", title:"Free Design", desc:"Free CAD Design for orders > 50k"},
+            {id:"O-3", title:"Referral Bonus", desc:"Get ₹500 for referring a client"}
         ],
         settings: {
-            theme: "dark",
+            theme: "dark", // dark, light, festival
             whatsappBlurb: "Hello, I am interested in a fabrication job.",
             shopName: "Manku Metal Works"
         }
@@ -50,10 +51,15 @@
 
         const parsed = JSON.parse(stored);
         // Robust Merge: Ensure all SEED arrays exist in parsed data
-        // This fixes the crash where new features (showcase) are missing in old localStorage
         Object.keys(SEED).forEach(key => {
             if (!parsed[key]) parsed[key] = SEED[key];
         });
+
+        // Force update showcase images if they are missing or old format (colors)
+        if (parsed.showcase && parsed.showcase.some(s => !s.img)) {
+            parsed.showcase = SEED.showcase;
+        }
+
         return parsed;
     };
 
@@ -71,11 +77,7 @@
         const body = opts?.body ? JSON.parse(opts.body) : {};
 
         // API ROUTER
-
-        // GET ALL
-        if (url === '/api/init' && method === 'GET') {
-            return { json: async () => DB };
-        }
+        if (url === '/api/init' && method === 'GET') return { json: async () => DB };
 
         // --- AUTH ---
         if (url === '/api/login' && method === 'POST') {
@@ -88,7 +90,6 @@
 
         // --- JOBS ---
         if (url === '/api/jobs' && method === 'POST') {
-            // Visitor request or Admin create
             const newJob = {
                 id: `J-${Date.now()}`,
                 status: "PENDING",
@@ -115,46 +116,24 @@
             return { json: async () => ({success:true}) };
         }
 
-        // --- CLIENTS ---
-        if (url === '/api/clients' && method === 'POST') {
-            const newClient = { ...body, id: `C-${Date.now()}`, history:[] };
-            DB.clients.unshift(newClient);
-            saveData();
-            return { json: async () => newClient };
-        }
-
-        // --- INVENTORY ---
-        if (url === '/api/inventory' && method === 'POST') {
-            const newItem = { ...body, id: `I-${Date.now()}`, usage:0 };
-            DB.inventory.push(newItem);
-            saveData();
-            return { json: async () => newItem };
-        }
-        if (url.startsWith('/api/inventory/') && method === 'PUT') {
-            const id = url.split('/').pop();
-            const idx = DB.inventory.findIndex(i => i.id === id);
-            if (idx > -1) {
-                DB.inventory[idx] = { ...DB.inventory[idx], ...body };
+        // --- CLIENTS, INVENTORY, VENDORS, TEMPLATES (Standard Create) ---
+        ['clients', 'inventory', 'vendors', 'templates'].forEach(coll => {
+            if (url === `/api/${coll}` && method === 'POST') {
+                const item = { ...body, id: `${coll[0].toUpperCase()}-${Date.now()}` };
+                if(coll==='clients') item.history = [];
+                if(coll==='inventory') item.usage = 0;
+                DB[coll].push(item);
                 saveData();
-                return { json: async () => DB.inventory[idx] };
+                // Return wrapped item
+                // We need to return a promise for this
             }
-        }
+        });
 
-        // --- VENDORS ---
-        if (url === '/api/vendors' && method === 'POST') {
-            const newVendor = { ...body, id: `V-${Date.now()}` };
-            DB.vendors.push(newVendor);
-            saveData();
-            return { json: async () => newVendor };
-        }
-
-        // --- TEMPLATES ---
-        if (url === '/api/templates' && method === 'POST') {
-            const newTemplate = { ...body, id: `T-${Date.now()}` };
-            DB.templates.push(newTemplate);
-            saveData();
-            return { json: async () => newTemplate };
-        }
+        // Manual implementation for return values to avoid async issues in loop above
+        if (url === '/api/clients' && method === 'POST') return { json: async () => DB.clients[DB.clients.length-1] };
+        if (url === '/api/vendors' && method === 'POST') return { json: async () => DB.vendors[DB.vendors.length-1] };
+        if (url === '/api/templates' && method === 'POST') return { json: async () => DB.templates[DB.templates.length-1] };
+        if (url === '/api/inventory' && method === 'POST') return { json: async () => DB.inventory[DB.inventory.length-1] };
 
         // --- SETTINGS ---
         if (url === '/api/settings' && method === 'PUT') {
