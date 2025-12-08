@@ -77,15 +77,15 @@
         const body = opts?.body ? JSON.parse(opts.body) : {};
 
         // API ROUTER
-        if (url === '/api/init' && method === 'GET') return { json: async () => DB };
+        if (url === '/api/init' && method === 'GET') return { ok: true, status: 200, json: async () => DB };
 
         // --- AUTH ---
         if (url === '/api/login' && method === 'POST') {
             const { user, pass } = body;
-            if (user === 'admin' && pass === 'admin') return { json: async () => ({role:'ADMIN', name:'Admin'}) };
+            if (user === 'admin' && pass === 'admin') return { ok: true, status: 200, json: async () => ({role:'ADMIN', name:'Admin'}) };
             const client = DB.clients.find(c => c.phone === user && (c.password === pass || pass === '123'));
-            if (client) return { json: async () => ({role:'CLIENT', ...client}) };
-            return { status: 401, json: async () => ({error:'Invalid Credentials'}) };
+            if (client) return { ok: true, status: 200, json: async () => ({role:'CLIENT', ...client}) };
+            return { ok: false, status: 401, json: async () => ({error:'Invalid Credentials'}) };
         }
 
         // --- JOBS ---
@@ -98,7 +98,7 @@
             };
             DB.jobs.unshift(newJob);
             saveData();
-            return { json: async () => newJob };
+            return { ok: true, status: 200, json: async () => newJob };
         }
         if (url.startsWith('/api/jobs/') && method === 'PUT') {
             const id = url.split('/').pop();
@@ -106,14 +106,14 @@
             if (idx > -1) {
                 DB.jobs[idx] = { ...DB.jobs[idx], ...body };
                 saveData();
-                return { json: async () => DB.jobs[idx] };
+                return { ok: true, status: 200, json: async () => DB.jobs[idx] };
             }
         }
         if (url.startsWith('/api/jobs/') && method === 'DELETE') {
             const id = url.split('/').pop();
             DB.jobs = DB.jobs.filter(j => j.id !== id);
             saveData();
-            return { json: async () => ({success:true}) };
+            return { ok: true, status: 200, json: async () => ({success:true}) };
         }
 
         // --- CLIENTS, INVENTORY, VENDORS, TEMPLATES (Standard Create) ---
@@ -130,16 +130,16 @@
         });
 
         // Manual implementation for return values to avoid async issues in loop above
-        if (url === '/api/clients' && method === 'POST') return { json: async () => DB.clients[DB.clients.length-1] };
-        if (url === '/api/vendors' && method === 'POST') return { json: async () => DB.vendors[DB.vendors.length-1] };
-        if (url === '/api/templates' && method === 'POST') return { json: async () => DB.templates[DB.templates.length-1] };
-        if (url === '/api/inventory' && method === 'POST') return { json: async () => DB.inventory[DB.inventory.length-1] };
+        if (url === '/api/clients' && method === 'POST') return { ok: true, status: 200, json: async () => DB.clients[DB.clients.length-1] };
+        if (url === '/api/vendors' && method === 'POST') return { ok: true, status: 200, json: async () => DB.vendors[DB.vendors.length-1] };
+        if (url === '/api/templates' && method === 'POST') return { ok: true, status: 200, json: async () => DB.templates[DB.templates.length-1] };
+        if (url === '/api/inventory' && method === 'POST') return { ok: true, status: 200, json: async () => DB.inventory[DB.inventory.length-1] };
 
         // --- SETTINGS ---
         if (url === '/api/settings' && method === 'PUT') {
             DB.settings = { ...DB.settings, ...body };
             saveData();
-            return { json: async () => DB.settings };
+            return { ok: true, status: 200, json: async () => DB.settings };
         }
 
         // --- GAS PROXY (Simulated) ---
@@ -153,13 +153,13 @@
                 // GAS Payload Limit Check (approx 2MB limit usually, but user said 50KB or something small? No "payload limits" usually means 50MB for POST, but GAS execution time is limit. User mentioned base64 string exceeds limits.)
                 // Let's assume the compression target is ~150KB. If we get something huge, we fail.
                 if (body.image.length > 2000000) { // 2MB roughly
-                     return { status: 413, json: async() => ({error: "Payload Too Large"}) };
+                     return { ok: false, status: 413, json: async() => ({error: "Payload Too Large"}) };
                 }
 
-                return { json: async () => ({status: "success", url: "https://placehold.co/600x400/green/white?text=Uploaded+Image"}) };
+                return { ok: true, status: 200, json: async () => ({status: "success", url: "https://placehold.co/600x400/green/white?text=Uploaded+Image"}) };
             }
         }
 
-        return { json: async () => DB };
+        return { ok: true, status: 200, json: async () => DB };
     };
 })();
