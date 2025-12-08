@@ -41,7 +41,8 @@
         settings: {
             theme: "dark", // dark, light, festival
             whatsappBlurb: "Hello, I am interested in a fabrication job.",
-            shopName: "Manku Metal Works"
+            shopName: "Manku Metal Works",
+            monthlyTarget: 100000
         }
     };
 
@@ -55,9 +56,17 @@
             if (!parsed[key]) parsed[key] = SEED[key];
         });
 
-        // Force update showcase images if they are missing or old format (colors)
-        if (parsed.showcase && parsed.showcase.some(s => !s.img)) {
-            parsed.showcase = SEED.showcase;
+        // Migration: Ensure monthlyTarget exists
+        if (!parsed.settings.monthlyTarget) parsed.settings.monthlyTarget = SEED.settings.monthlyTarget;
+
+        // Migration: Showcase images array
+        if (parsed.showcase) {
+            parsed.showcase.forEach(s => {
+                if (s.img && !s.images) {
+                    s.images = [s.img, s.img, s.img]; // Seed with 3 for demo
+                    delete s.img;
+                }
+            });
         }
 
         return parsed;
@@ -77,15 +86,15 @@
         const body = opts?.body ? JSON.parse(opts.body) : {};
 
         // API ROUTER
-        if (url === '/api/init' && method === 'GET') return { json: async () => DB };
+        if (url === '/api/init' && method === 'GET') return { ok: true, status: 200, json: async () => DB };
 
         // --- AUTH ---
         if (url === '/api/login' && method === 'POST') {
             const { user, pass } = body;
-            if (user === 'admin' && pass === 'admin') return { json: async () => ({role:'ADMIN', name:'Admin'}) };
+            if (user === 'admin' && pass === 'admin') return { ok: true, status: 200, json: async () => ({role:'ADMIN', name:'Admin'}) };
             const client = DB.clients.find(c => c.phone === user && (c.password === pass || pass === '123'));
-            if (client) return { json: async () => ({role:'CLIENT', ...client}) };
-            return { status: 401, json: async () => ({error:'Invalid Credentials'}) };
+            if (client) return { ok: true, status: 200, json: async () => ({role:'CLIENT', ...client}) };
+            return { ok: false, status: 401, json: async () => ({error:'Invalid Credentials'}) };
         }
 
         // --- JOBS ---
@@ -98,7 +107,7 @@
             };
             DB.jobs.unshift(newJob);
             saveData();
-            return { json: async () => newJob };
+            return { ok: true, status: 200, json: async () => newJob };
         }
         if (url.startsWith('/api/jobs/') && method === 'PUT') {
             const id = url.split('/').pop();
@@ -106,22 +115,23 @@
             if (idx > -1) {
                 DB.jobs[idx] = { ...DB.jobs[idx], ...body };
                 saveData();
-                return { json: async () => DB.jobs[idx] };
+                return { ok: true, status: 200, json: async () => DB.jobs[idx] };
             }
         }
         if (url.startsWith('/api/jobs/') && method === 'DELETE') {
             const id = url.split('/').pop();
             DB.jobs = DB.jobs.filter(j => j.id !== id);
             saveData();
-            return { json: async () => ({success:true}) };
+            return { ok: true, status: 200, json: async () => ({success:true}) };
         }
 
         // --- CLIENTS, INVENTORY, VENDORS, TEMPLATES (Standard Create) ---
-        ['clients', 'inventory', 'vendors', 'templates'].forEach(coll => {
+        ['clients', 'inventory', 'vendors', 'templates', 'showcase'].forEach(coll => {
             if (url === `/api/${coll}` && method === 'POST') {
                 const item = { ...body, id: `${coll[0].toUpperCase()}-${Date.now()}` };
                 if(coll==='clients') item.history = [];
                 if(coll==='inventory') item.usage = 0;
+                if(coll==='showcase' && !item.images) item.images = [];
                 DB[coll].push(item);
                 saveData();
                 // Return wrapped item
@@ -130,18 +140,74 @@
         });
 
         // Manual implementation for return values to avoid async issues in loop above
-        if (url === '/api/clients' && method === 'POST') return { json: async () => DB.clients[DB.clients.length-1] };
-        if (url === '/api/vendors' && method === 'POST') return { json: async () => DB.vendors[DB.vendors.length-1] };
-        if (url === '/api/templates' && method === 'POST') return { json: async () => DB.templates[DB.templates.length-1] };
-        if (url === '/api/inventory' && method === 'POST') return { json: async () => DB.inventory[DB.inventory.length-1] };
+        if (url === '/api/clients' && method === 'POST') return { ok: true, status: 200, json: async () => DB.clients[DB.clients.length-1] };
+        if (url === '/api/vendors' && method === 'POST') return { ok: true, status: 200, json: async () => DB.vendors[DB.vendors.length-1] };
+        if (url === '/api/templates' && method === 'POST') return { ok: true, status: 200, json: async () => DB.templates[DB.templates.length-1] };
+        if (url === '/api/inventory' && method === 'POST') return { ok: true, status: 200, json: async () => DB.inventory[DB.inventory.length-1] };
+        if (url === '/api/showcase' && method === 'POST') return { ok: true, status: 200, json: async () => DB.showcase[DB.showcase.length-1] };
+
+        // --- UPDATES (PUT) ---
+        if (url.startsWith('/api/clients/') && method === 'PUT') {
+            const id = url.split('/').pop();
+            const idx = DB.clients.findIndex(c => c.id === id);
+            if (idx > -1) {
+                DB.clients[idx] = { ...DB.clients[idx], ...body };
+                saveData();
+                return { ok: true, status: 200, json: async () => DB.clients[idx] };
+            }
+        }
+        if (url.startsWith('/api/inventory/') && method === 'PUT') {
+            const id = url.split('/').pop();
+            const idx = DB.inventory.findIndex(i => i.id === id);
+            if (idx > -1) {
+                DB.inventory[idx] = { ...DB.inventory[idx], ...body };
+                saveData();
+                return { ok: true, status: 200, json: async () => DB.inventory[idx] };
+            }
+        }
+        if (url.startsWith('/api/showcase/') && method === 'PUT') {
+            const id = url.split('/').pop();
+            const idx = DB.showcase.findIndex(s => s.id === id);
+            if (idx > -1) {
+                // Special handling for images array if needed, but generic merge works for now
+                // If body contains images: [...], it replaces. If we want push, logic should be in frontend
+                DB.showcase[idx] = { ...DB.showcase[idx], ...body };
+                saveData();
+                return { ok: true, status: 200, json: async () => DB.showcase[idx] };
+            }
+        }
+        if (url.startsWith('/api/showcase/') && method === 'DELETE') {
+            const id = url.split('/').pop();
+            DB.showcase = DB.showcase.filter(s => s.id !== id);
+            saveData();
+            return { ok: true, status: 200, json: async () => ({success:true}) };
+        }
 
         // --- SETTINGS ---
         if (url === '/api/settings' && method === 'PUT') {
             DB.settings = { ...DB.settings, ...body };
             saveData();
-            return { json: async () => DB.settings };
+            return { ok: true, status: 200, json: async () => DB.settings };
         }
 
-        return { json: async () => DB };
+        // --- GAS PROXY (Simulated) ---
+        if (url === '/api/exec' && method === 'POST') {
+            if (body.action === 'upload_image') {
+                console.log("[MOCK] Upload Image:", body.filename, body.mimeType);
+
+                // Stress Test Simulation: Random Failures or Timeouts
+                // if (Math.random() < 0.1) return { status: 500, json: async () => ({error: "Simulated Server Error"}) };
+
+                // GAS Payload Limit Check (approx 2MB limit usually, but user said 50KB or something small? No "payload limits" usually means 50MB for POST, but GAS execution time is limit. User mentioned base64 string exceeds limits.)
+                // Let's assume the compression target is ~150KB. If we get something huge, we fail.
+                if (body.image.length > 2000000) { // 2MB roughly
+                     return { ok: false, status: 413, json: async() => ({error: "Payload Too Large"}) };
+                }
+
+                return { ok: true, status: 200, json: async () => ({status: "success", url: "https://placehold.co/600x400/green/white?text=Uploaded+Image"}) };
+            }
+        }
+
+        return { ok: true, status: 200, json: async () => DB };
     };
 })();

@@ -59,7 +59,65 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users, Settings, LogOut, Download } = LucideReact;
+        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users, Settings, LogOut, Download, UploadCloud, AlertTriangle, Plus, Edit, X, ChevronLeft, ChevronRight, Save } = LucideReact;
+
+        // API SERVICE (External to React for broader scope)
+        const api = {
+            post: async (payload) => {
+                const res = await window.mockFetch('/api/exec', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+                return res.json();
+            },
+            upload: (file) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 1024; // Constraint for GAS payload limit
+                        const scaleSize = MAX_WIDTH / img.width;
+
+                        // Only scale down if width exceeds MAX_WIDTH
+                        if (img.width > MAX_WIDTH) {
+                            canvas.width = MAX_WIDTH;
+                            canvas.height = img.height * scaleSize;
+                        } else {
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                        }
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        // Compress to ~150KB (0.7 quality usually does the trick)
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+                        // Optimistic UI Update (Resolve immediately)
+                        resolve(compressedBase64);
+
+                        // Silent Background Upload with Error Handling
+                        api.post({
+                            action: "upload_image",
+                            image: compressedBase64,
+                            mimeType: "image/jpeg",
+                            filename: file.name
+                        }).then(() => {
+                             if(window.showToast) window.showToast("Upload Synced!", "success");
+                        }).catch(e => {
+                             console.error("Background Upload Failed", e);
+                             if(window.showToast) window.showToast("Sync Failed - Retrying...", "error");
+                             // Retry logic could be added here
+                        });
+                    };
+                    img.onerror = (e) => reject(new Error("Image Load Failed"));
+                };
+                reader.onerror = (error) => reject(error);
+            })
+        };
 
         // 1. FABRICATOR HUD (Camera + Horizon + Grid)
         const FabricatorHUD = ({ onClose }) => {
@@ -111,6 +169,7 @@
         const ToolsModal = ({ onClose }) => {
             const [mode, setMode] = useState('PIE');
             const [res, setRes] = useState(null);
+            const [uploading, setUploading] = useState(false);
 
             // Level State
             const [tilt, setTilt] = useState({gamma:0, beta:0});
@@ -190,14 +249,41 @@
                 link.click();
             };
 
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setUploading(true);
+                api.upload(file)
+                    .then(base64 => {
+                        setRes({text: "Image Compressed & Uploading...", type: 'image', img: base64});
+                        setUploading(false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        setRes({text: "Upload Failed", type: 'error'});
+                        setUploading(false);
+                    });
+            };
+
             return (
                 <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
                     <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative h-[80vh] overflow-y-auto">
                         <button onClick={onClose} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
                         <h2 className="font-stencil text-2xl text-rust mb-4">FABRICATOR SUITE</h2>
                         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
-                            {['PIE', 'TRIANGLE', 'RADIUS', 'LEVEL', 'GRID', 'CONVERT', 'SVG', 'NOTCHER'].map(m => <button key={m} onClick={()=>{setMode(m);setRes(null)}} className={`px-2 py-1 text-xs font-bold whitespace-nowrap ${mode===m?'bg-rust text-black':'bg-surface border border-metal'}`}>{m}</button>)}
+                            {['PIE', 'TRIANGLE', 'RADIUS', 'LEVEL', 'GRID', 'CONVERT', 'SVG', 'NOTCHER', 'UPLOAD'].map(m => <button key={m} onClick={()=>{setMode(m);setRes(null)}} className={`px-2 py-1 text-xs font-bold whitespace-nowrap ${mode===m?'bg-rust text-black':'bg-surface border border-metal'}`}>{m}</button>)}
                         </div>
+
+                        {mode === 'UPLOAD' && (
+                            <div className="space-y-4 text-center">
+                                <h3 className="font-bold text-white">UPLOAD PHOTO</h3>
+                                <div className="border-2 border-dashed border-metal p-8 relative">
+                                    <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                    {uploading ? <div className="text-rust animate-pulse">COMPRESSING...</div> : <div className="text-metal">Tap to Select Image</div>}
+                                </div>
+                                <p className="text-xs text-metal">Auto-compressed to 1024px width before upload.</p>
+                            </div>
+                        )}
 
                         {mode === 'PIE' && (
                             <div className="space-y-4">
@@ -376,12 +462,51 @@
                         )}
 
                         {res && res.text && <div className="mt-4 p-4 border border-green-500 text-green-500 font-mono text-center text-lg animate-pulse">{res.text}</div>}
+                        {res && res.type === 'image' && <img src={res.img} className="w-full mt-2 border border-white" />}
                     </div>
                 </div>
             );
         };
 
-        // 3. QUOTE GENERATOR (A4 Layout)
+        // 3. IMAGE CAROUSEL COMPONENT
+        const ImageCarousel = ({ images, height="h-64" }) => {
+            const [idx, setIdx] = useState(0);
+            const timerRef = useRef(null);
+
+            useEffect(() => {
+                if(!images || images.length <= 1) return;
+                timerRef.current = setInterval(() => {
+                    setIdx(prev => (prev + 1) % images.length);
+                }, 3000);
+                return () => clearInterval(timerRef.current);
+            }, [images]);
+
+            if(!images || images.length === 0) return <div className={`w-full ${height} bg-black flex items-center justify-center text-metal`}>No Image</div>;
+
+            return (
+                <div className={`w-full ${height} relative group`}>
+                    <img src={images[idx]} className="w-full h-full object-cover transition-opacity duration-500" />
+
+                    {/* Navigation Overlays */}
+                    {images.length > 1 && (
+                        <>
+                            <div className="absolute inset-0 flex items-center justify-between p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e)=>{e.stopPropagation(); clearInterval(timerRef.current); setIdx(i => i===0 ? images.length-1 : i-1)}} className="bg-black/50 text-white p-1 rounded-full"><ChevronLeft size={20}/></button>
+                                <button onClick={(e)=>{e.stopPropagation(); clearInterval(timerRef.current); setIdx(i => (i+1)%images.length)}} className="bg-black/50 text-white p-1 rounded-full"><ChevronRight size={20}/></button>
+                            </div>
+                            {/* Thumbnails */}
+                            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                {images.map((_, i) => (
+                                    <div key={i} className={`w-2 h-2 rounded-full ${i===idx ? 'bg-rust' : 'bg-white/50'}`}></div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        };
+
+        // 4. QUOTE GENERATOR (A4 Layout)
         const QuoteModal = ({ job, onClose }) => {
             // Mock split for Material/Labor
             const materialCost = Math.round(job.cost * 0.7);
@@ -426,7 +551,7 @@
             );
         };
 
-        // 4. MAIN APP
+        // 5. MAIN APP
         const App = () => {
             const [user, setUser] = useState(null); // null = Visitor
             const [view, setView] = useState('VISITOR');
@@ -435,15 +560,26 @@
             const [quoteJob, setQuoteJob] = useState(null);
             const [jobDetail, setJobDetail] = useState(null); // Selected Job Object
             const [editJob, setEditJob] = useState(null); // Job Object being edited
+            const [editClient, setEditClient] = useState(null); // Client being edited
             const [showNewJob, setShowNewJob] = useState(false);
+            const [showAddShowcase, setShowAddShowcase] = useState(false); // New Showcase Item Modal
             const [loginOpen, setLoginOpen] = useState(false);
+            const [toast, setToast] = useState(null);
 
             // Showcase State
             const [showcaseFilter, setShowcaseFilter] = useState('ALL');
 
-            const [data, setData] = useState({jobs:[], clients:[], inventory:[], vendors:[], templates:[], showcase:[], offers:[], settings:{}});
+            const [data, setData] = useState({jobs:[], clients:[], inventory:[], vendors:[], templates:[], showcase:[], offers:[], settings:{monthlyTarget:100000}});
             const [selectedClient, setSelectedClient] = useState(null);
             const [searchTerm, setSearchTerm] = useState("");
+
+            // Expose Toast to Global API
+            useEffect(() => {
+                window.showToast = (msg, type='info') => {
+                    setToast({msg, type});
+                    setTimeout(() => setToast(null), 3000);
+                };
+            }, []);
 
             const refreshData = () => window.mockFetch('/api/init').then(r => r.json()).then(setData);
             useEffect(() => { refreshData() }, []);
@@ -497,6 +633,15 @@
                 e.target.reset();
             };
 
+            const updateClient = async (e) => {
+                e.preventDefault();
+                const d = new FormData(e.target);
+                const payload = { name: d.get('name'), company: d.get('company'), phone: d.get('phone') };
+                await window.mockFetch(`/api/clients/${editClient.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+                setEditClient(null);
+                refreshData();
+            };
+
             const createVendor = async (e) => {
                 e.preventDefault();
                 const d = new FormData(e.target);
@@ -535,6 +680,60 @@
             const updateStatus = async (job, status) => {
                 await window.mockFetch(`/api/jobs/${job.id}`, { method: 'PUT', body: JSON.stringify({status}) });
                 if(jobDetail && jobDetail.id === job.id) setJobDetail({...jobDetail, status});
+                refreshData();
+            };
+
+            const updateStock = async (item, qty) => {
+                const newStock = parseInt(item.stock) + parseInt(qty);
+                await window.mockFetch(`/api/inventory/${item.id}`, { method: 'PUT', body: JSON.stringify({stock: newStock}) });
+                refreshData();
+            };
+
+            const addShowcaseItem = async (e) => {
+                e.preventDefault();
+                const d = new FormData(e.target);
+                const file = d.get('image');
+                if(!file || file.size === 0) return alert("Please select an image");
+
+                try {
+                    const base64 = await api.upload(file);
+                    const payload = {
+                        title: d.get('title'),
+                        tag: d.get('tag'),
+                        images: [base64]
+                    };
+                    await window.mockFetch('/api/showcase', { method: 'POST', body: JSON.stringify(payload) });
+                    setShowAddShowcase(false);
+                    refreshData();
+                } catch(err) {
+                    console.error(err);
+                    window.showToast("Failed to upload image", "error");
+                }
+            };
+
+            const addImageToShowcase = async (item, file) => {
+                try {
+                    const base64 = await api.upload(file);
+                    const newImages = [...(item.images || []), base64];
+                    await window.mockFetch(`/api/showcase/${item.id}`, { method: 'PUT', body: JSON.stringify({images: newImages}) });
+                    refreshData();
+                } catch(err) {
+                    window.showToast("Upload failed", "error");
+                }
+            };
+
+            const deleteShowcaseItem = async (id) => {
+                if(!confirm("Delete this project?")) return;
+                await window.mockFetch(`/api/showcase/${id}`, { method: 'DELETE' });
+                refreshData();
+            };
+
+            const updateShowcaseItem = async (e, id) => {
+                e.preventDefault();
+                const d = new FormData(e.target);
+                const payload = { title: d.get('title'), tag: d.get('tag') };
+                await window.mockFetch(`/api/showcase/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+                // We need to close edit mode here, logic handled in view
                 refreshData();
             };
 
@@ -634,6 +833,21 @@
                                     </div>
                                 </div>
 
+                                {/* MONTHLY TARGET */}
+                                <div className="bg-surface p-4 border border-metal/30">
+                                    <div className="flex justify-between text-xs font-bold mb-1">
+                                        <span className="text-metal">MONTHLY TARGET</span>
+                                        <span className="text-green-500">{Math.round((income / (data.settings?.monthlyTarget || 100000)) * 100)}%</span>
+                                    </div>
+                                    <div className="w-full bg-black h-2 rounded-full overflow-hidden">
+                                        <div className="bg-green-500 h-full transition-all duration-1000" style={{width: `${Math.min((income / (data.settings?.monthlyTarget || 100000)) * 100, 100)}%`}}></div>
+                                    </div>
+                                    <div className="flex justify-between text-[10px] text-metal mt-1">
+                                        <span>₹{(income/1000).toFixed(1)}K</span>
+                                        <span>Target: ₹{((data.settings?.monthlyTarget || 100000)/1000).toFixed(1)}K</span>
+                                    </div>
+                                </div>
+
                                 {/* STATUS CHART */}
                                 <div className="bg-surface p-4">
                                     <h3 className="text-xs font-bold text-metal mb-4">JOB STATUS</h3>
@@ -713,7 +927,8 @@
                                 </div>
                                 <input placeholder="Search Clients..." className="w-full bg-surface border border-metal p-3 text-white focus:border-rust outline-none" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
                                 {filteredClients.map(c => (
-                                    <div key={c.id} className="bg-surface p-4 cursor-pointer hover:bg-surface/80" onClick={()=>setSelectedClient(c)}>
+                                    <div key={c.id} className="bg-surface p-4 cursor-pointer hover:bg-surface/80 group relative" onClick={()=>setSelectedClient(c)}>
+                                        <button onClick={(e)=>{e.stopPropagation(); setEditClient(c)}} className="absolute top-2 right-2 text-metal hover:text-white bg-black/50 p-1 rounded"><Edit size={14} /></button>
                                         <div className="font-bold text-lg">{c.company}</div>
                                         <div className="text-xs text-metal">{c.name} | {c.phone}</div>
                                         <div className="mt-2 flex justify-between items-center">
@@ -727,25 +942,42 @@
 
                         {view === 'SHOWCASE' && (
                             <div className="space-y-4">
-                                <div className="flex gap-2 overflow-x-auto pb-2">
-                                    {['ALL', 'Gate', 'Grill', 'Industrial'].map(tag => (
-                                        <button key={tag} onClick={()=>setShowcaseFilter(tag)} className={`px-3 py-1 text-xs font-bold whitespace-nowrap ${showcaseFilter===tag?'bg-rust text-black':'bg-surface border border-metal'}`}>{tag}</button>
-                                    ))}
+                                <div className="flex justify-between items-center border-b border-surface pb-2">
+                                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                                        {['ALL', 'Gate', 'Grill', 'Industrial'].map(tag => (
+                                            <button key={tag} onClick={()=>setShowcaseFilter(tag)} className={`px-3 py-1 text-xs font-bold whitespace-nowrap ${showcaseFilter===tag?'bg-rust text-black':'bg-surface border border-metal'}`}>{tag}</button>
+                                        ))}
+                                    </div>
+                                    {user?.role === 'ADMIN' && <button onClick={()=>setShowAddShowcase(true)} className="bg-rust text-black px-2 py-1 text-xs font-bold whitespace-nowrap flex items-center gap-1"><Plus size={14}/> NEW</button>}
                                 </div>
                                 <div className="space-y-6">
                                     {data.showcase
                                         .filter(i => showcaseFilter === 'ALL' || i.tag === showcaseFilter)
                                         .map(item => (
-                                        <div key={item.id} className="bg-surface border border-metal/30">
-                                            <h3 className="font-bold text-lg p-2 border-b border-metal/30 font-stencil">{item.title}</h3>
-                                            <div className="w-full h-64 relative">
-                                                <img src={item.img} className="w-full h-full object-cover" />
-                                            </div>
-                                            <div className="p-2 flex gap-2 overflow-x-auto">
-                                                {/* Simulated carousel of related images */}
-                                                {[1,2,3].map(n => (
-                                                    <div key={n} className="w-20 h-20 flex-shrink-0 border border-metal">
-                                                        <img src={item.img} className="w-full h-full object-cover opacity-70" />
+                                        <div key={item.id} className="bg-surface border border-metal/30 relative group">
+                                            {user?.role === 'ADMIN' && (
+                                                <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <label className="bg-black/50 text-white p-1 rounded cursor-pointer hover:bg-rust hover:text-black">
+                                                        <UploadCloud size={14} />
+                                                        <input type="file" accept="image/*" className="hidden" onChange={(e)=>addImageToShowcase(item, e.target.files[0])} />
+                                                    </label>
+                                                    <button onClick={()=>deleteShowcaseItem(item.id)} className="bg-black/50 text-red-500 p-1 rounded hover:bg-white"><X size={14} /></button>
+                                                </div>
+                                            )}
+
+                                            <h3 className="font-bold text-lg p-2 border-b border-metal/30 font-stencil flex justify-between">
+                                                {item.title}
+                                                <span className="text-xs font-sans text-metal bg-black px-2 py-1 rounded">{item.tag}</span>
+                                            </h3>
+
+                                            {/* CAROUSEL */}
+                                            <ImageCarousel images={item.images || [item.img]} />
+
+                                            <div className="p-2 flex gap-2 overflow-x-auto no-scrollbar">
+                                                {/* Thumbnails Strip */}
+                                                {(item.images || [item.img]).map((img, i) => (
+                                                    <div key={i} className="w-16 h-16 flex-shrink-0 border border-metal cursor-pointer hover:border-rust">
+                                                        <img src={img} className="w-full h-full object-cover" />
                                                     </div>
                                                 ))}
                                             </div>
@@ -790,6 +1022,10 @@
                                         </select>
                                     </div>
                                     <div className="space-y-2">
+                                        <label className="text-xs font-bold">Monthly Revenue Target (₹)</label>
+                                        <input type="number" defaultValue={data.settings?.monthlyTarget} onChange={e=>window.mockFetch('/api/settings', {method:'PUT', body:JSON.stringify({monthlyTarget: parseInt(e.target.value)})}).then(refreshData)} className="w-full bg-black border border-metal p-2 text-white text-xs" />
+                                    </div>
+                                    <div className="space-y-2">
                                         <label className="text-xs font-bold">WhatsApp Blurb</label>
                                         <textarea className="w-full bg-black border border-metal p-2 text-white text-xs" defaultValue={data.settings?.whatsappBlurb}></textarea>
                                         <button className="w-full bg-rust text-black text-xs font-bold py-2">UPDATE</button>
@@ -806,7 +1042,13 @@
                                         {data.inventory.map(i => (
                                             <div key={i.id} className="flex justify-between items-center bg-black/20 p-2">
                                                 <div><div className="font-bold">{i.item}</div><div className="text-[10px] text-metal">Usage: {i.usage}</div></div>
-                                                <div className="text-right"><div className="text-xl font-mono text-green-500">{i.stock}</div><div className="text-[10px]">{i.unit}</div></div>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-right"><div className="text-xl font-mono text-green-500">{i.stock}</div><div className="text-[10px]">{i.unit}</div></div>
+                                                    <button onClick={()=>{
+                                                        const qty = prompt(`Add Stock for ${i.item}:`);
+                                                        if(qty && !isNaN(qty)) updateStock(i, qty);
+                                                    }} className="bg-rust text-black p-1 rounded"><Plus size={16} /></button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -848,13 +1090,48 @@
                                     {selectedClient.history.map(jid => {
                                         const job = data.jobs.find(j => j.id === jid) || {id: jid, project: "Archived Job", date: "N/A", status:"DONE"};
                                         return (
-                                            <div key={jid} className="bg-black/20 p-2 text-sm">
+                                            <div key={jid} onClick={()=>{setJobDetail(job)}} className="bg-black/20 p-2 text-sm cursor-pointer hover:bg-black/40 border border-transparent hover:border-rust transition-colors">
                                                 <div className="flex justify-between font-bold"><span>{job.project}</span><span>{job.date}</span></div>
                                                 <div className="text-xs text-metal">#{jid} - {job.status}</div>
                                             </div>
                                         );
                                     })}
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {editClient && (
+                        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4">
+                            <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative">
+                                <button onClick={()=>setEditClient(null)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
+                                <h2 className="font-stencil text-2xl text-rust mb-4">EDIT CLIENT</h2>
+                                <form onSubmit={updateClient} className="space-y-3">
+                                    <input name="name" defaultValue={editClient.name} placeholder="Name" className="w-full bg-black border border-metal p-2 text-white" />
+                                    <input name="company" defaultValue={editClient.company} placeholder="Company" className="w-full bg-black border border-metal p-2 text-white" />
+                                    <input name="phone" defaultValue={editClient.phone} placeholder="Phone" className="w-full bg-black border border-metal p-2 text-white" />
+                                    <button className="w-full bg-rust py-3 font-bold text-black mt-4">SAVE CHANGES</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {showAddShowcase && (
+                        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4">
+                            <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative">
+                                <button onClick={()=>setShowAddShowcase(false)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
+                                <h2 className="font-stencil text-2xl text-rust mb-4">ADD PROJECT</h2>
+                                <form onSubmit={addShowcaseItem} className="space-y-3">
+                                    <input name="title" placeholder="Project Title" required className="w-full bg-black border border-metal p-2 text-white" />
+                                    <select name="tag" className="w-full bg-black border border-metal p-2 text-white">
+                                        <option value="Gate">Gate</option>
+                                        <option value="Grill">Grill</option>
+                                        <option value="Industrial">Industrial</option>
+                                    </select>
+                                    <label className="block text-xs font-bold text-metal mb-1">Cover Image</label>
+                                    <input type="file" name="image" accept="image/*" required className="w-full text-xs text-metal file:bg-rust file:text-black file:border-0 file:px-2 file:py-1" />
+                                    <button className="w-full bg-rust py-3 font-bold text-black mt-4">UPLOAD & CREATE</button>
+                                </form>
                             </div>
                         </div>
                     )}
@@ -1009,6 +1286,12 @@
                     {hud && <FabricatorHUD onClose={()=>setHud(false)} />}
                     {tools && <ToolsModal onClose={()=>setTools(false)} />}
                     {quoteJob && <QuoteModal job={quoteJob} onClose={()=>setQuoteJob(null)} />}
+
+                    {toast && (
+                        <div className={`fixed bottom-20 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-bold shadow-lg z-[100] ${toast.type==='error'?'bg-red-600 text-white':'bg-green-500 text-black'}`}>
+                            {toast.msg}
+                        </div>
+                    )}
                 </div>
             );
         };
