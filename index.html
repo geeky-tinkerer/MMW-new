@@ -59,7 +59,7 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users, Settings, LogOut, Download, UploadCloud, AlertTriangle, Plus, Edit, X, ChevronLeft, ChevronRight, Save } = LucideReact;
+        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users, Settings, LogOut, Download, UploadCloud, AlertTriangle, Plus, Edit, X, ChevronLeft, ChevronRight, Save, Phone, Share2, Sun, Moon, StickyNote, Table, Circle, Dna, Search } = LucideReact;
 
         // API SERVICE (External to React for broader scope)
         const api = {
@@ -170,6 +170,7 @@
             const [mode, setMode] = useState('PIE');
             const [res, setRes] = useState(null);
             const [uploading, setUploading] = useState(false);
+            const [notes, setNotes] = useState(localStorage.getItem('mmw_notes') || '');
 
             // Level State
             const [tilt, setTilt] = useState({gamma:0, beta:0});
@@ -184,12 +185,45 @@
             // Notcher State
             const [notchParams, setNotchParams] = useState({tubeOd: 40, headerOd: 40, angle: 90});
 
+            // Weight Calc State
+            const [weightParams, setWeightParams] = useState({type:'PLATE', l:1000, w:1000, t:5, dia:50, wt:2});
+
+            // Arc State
+            const [arcParams, setArcParams] = useState({c:100, h:10});
+
             useEffect(() => {
                 if (mode !== 'LEVEL') return;
                 const handleOr = (e) => setTilt({gamma: e.gamma||0, beta: e.beta||0});
                 window.addEventListener('deviceorientation', handleOr);
                 return () => window.removeEventListener('deviceorientation', handleOr);
             }, [mode]);
+
+            const saveNotes = (val) => {
+                setNotes(val);
+                localStorage.setItem('mmw_notes', val);
+            };
+
+            const calcWeight = () => {
+                const density = 0.00000785; // kg/mm3 for Steel
+                let vol = 0;
+                const {type, l, w, t, dia, wt} = weightParams;
+
+                if(type === 'PLATE') vol = l * w * t;
+                if(type === 'TUBE') vol = (Math.PI * (dia * wt - wt * wt)) * l; // Approx Area * Length
+                if(type === 'BAR') vol = (Math.PI * Math.pow(dia/2, 2)) * l;
+
+                const weight = vol * density;
+                setRes({text: `${weight.toFixed(2)} KG`, type: 'text'});
+            };
+
+            const calcArc = () => {
+                const {c, h} = arcParams; // Chord, Height (Sagitta)
+                if (h <= 0 || c <= 0) return;
+                const r = (c*c)/(8*h) + h/2;
+                const theta = 2 * Math.asin(c / (2*r)); // Radians
+                const arcLen = r * theta;
+                setRes({text: `R: ${r.toFixed(1)} | Arc Len: ${arcLen.toFixed(1)}`, type: 'text'});
+            };
 
             const calcPie = (e) => {
                 e.preventDefault();
@@ -227,15 +261,33 @@
             const calcConv = (e) => {
                 e.preventDefault();
                 const d = new FormData(e.target);
-                const val = parseFloat(d.get('val'));
+                const val = d.get('val'); // String to handle fraction input potentially later
+                const numVal = parseFloat(val);
                 const from = d.get('from');
                 let out = 0;
                 let unit = '';
-                if(from === 'MM_INCH') { out = val / 25.4; unit = 'inch'; }
-                if(from === 'INCH_MM') { out = val * 25.4; unit = 'mm'; }
-                if(from === 'KG_LBS') { out = val * 2.20462; unit = 'lbs'; }
-                if(from === 'LBS_KG') { out = val / 2.20462; unit = 'kg'; }
-                setRes({text: `${out.toFixed(3)} ${unit}`, type: 'text'});
+                let extra = '';
+
+                if(from === 'MM_INCH') {
+                    out = numVal / 25.4;
+                    unit = 'inch';
+                    // Fraction Logic
+                    const frac = out - Math.floor(out);
+                    const denoms = [2, 4, 8, 16, 32];
+                    for(let den of denoms) {
+                        if(Math.round(frac * den) / den === Math.round(frac*100)/100) { // Simple check
+                             // Not precise but OK for visual
+                        }
+                    }
+                    // Robust closest fraction:
+                    const den = 16;
+                    const num = Math.round(frac * den);
+                    if(num > 0) extra = ` (${Math.floor(out)} ${num}/${den})`;
+                }
+                if(from === 'INCH_MM') { out = numVal * 25.4; unit = 'mm'; }
+                if(from === 'KG_LBS') { out = numVal * 2.20462; unit = 'lbs'; }
+                if(from === 'LBS_KG') { out = numVal / 2.20462; unit = 'kg'; }
+                setRes({text: `${out.toFixed(3)} ${unit}${extra}`, type: 'text'});
             };
 
             const downloadSvg = (id, name) => {
@@ -271,8 +323,72 @@
                         <button onClick={onClose} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
                         <h2 className="font-stencil text-2xl text-rust mb-4">FABRICATOR SUITE</h2>
                         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
-                            {['PIE', 'TRIANGLE', 'RADIUS', 'LEVEL', 'GRID', 'CONVERT', 'SVG', 'NOTCHER', 'UPLOAD'].map(m => <button key={m} onClick={()=>{setMode(m);setRes(null)}} className={`px-2 py-1 text-xs font-bold whitespace-nowrap ${mode===m?'bg-rust text-black':'bg-surface border border-metal'}`}>{m}</button>)}
+                            {['PIE', 'TRIANGLE', 'RADIUS', 'LEVEL', 'GRID', 'CONVERT', 'SVG', 'NOTCHER', 'WEIGHT', 'ARC', 'TAP', 'NOTES', 'UPLOAD'].map(m => <button key={m} onClick={()=>{setMode(m);setRes(null)}} className={`px-2 py-1 text-xs font-bold whitespace-nowrap ${mode===m?'bg-rust text-black':'bg-surface border border-metal'}`}>{m}</button>)}
                         </div>
+
+                        {mode === 'WEIGHT' && (
+                            <div className="space-y-4">
+                                <div className="flex gap-2">
+                                    {['PLATE', 'TUBE', 'BAR'].map(t => <button key={t} onClick={()=>setWeightParams({...weightParams, type:t})} className={`flex-1 py-1 text-xs border ${weightParams.type===t?'border-rust text-rust':'border-metal text-metal'}`}>{t}</button>)}
+                                </div>
+                                {weightParams.type === 'PLATE' && (
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <label>Length (mm) <input type="number" value={weightParams.l} onChange={e=>setWeightParams({...weightParams, l:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                        <label>Width (mm) <input type="number" value={weightParams.w} onChange={e=>setWeightParams({...weightParams, w:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                        <label>Thk (mm) <input type="number" value={weightParams.t} onChange={e=>setWeightParams({...weightParams, t:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                    </div>
+                                )}
+                                {weightParams.type === 'TUBE' && (
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <label>Length (mm) <input type="number" value={weightParams.l} onChange={e=>setWeightParams({...weightParams, l:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                        <label>OD (mm) <input type="number" value={weightParams.dia} onChange={e=>setWeightParams({...weightParams, dia:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                        <label>Wall (mm) <input type="number" value={weightParams.wt} onChange={e=>setWeightParams({...weightParams, wt:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                    </div>
+                                )}
+                                {weightParams.type === 'BAR' && (
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <label>Length (mm) <input type="number" value={weightParams.l} onChange={e=>setWeightParams({...weightParams, l:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                        <label>Dia (mm) <input type="number" value={weightParams.dia} onChange={e=>setWeightParams({...weightParams, dia:e.target.value})} className="w-full bg-black border border-metal p-2" /></label>
+                                    </div>
+                                )}
+                                <button onClick={calcWeight} className="w-full bg-rust py-2 font-bold text-black">CALCULATE WEIGHT</button>
+                            </div>
+                        )}
+
+                        {mode === 'ARC' && (
+                            <div className="space-y-4">
+                                <div className="text-xs text-metal">Enter Chord Length (width) and Height (Sagitta) to find Radius.</div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <label>Chord (C) <input type="number" value={arcParams.c} onChange={e=>setArcParams({...arcParams, c:parseFloat(e.target.value)})} className="w-full bg-black border border-metal p-2" /></label>
+                                    <label>Height (H) <input type="number" value={arcParams.h} onChange={e=>setArcParams({...arcParams, h:parseFloat(e.target.value)})} className="w-full bg-black border border-metal p-2" /></label>
+                                </div>
+                                <button onClick={calcArc} className="w-full bg-rust py-2 font-bold text-black">CALCULATE ARC</button>
+                            </div>
+                        )}
+
+                        {mode === 'TAP' && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs text-left">
+                                    <thead><tr className="border-b border-metal text-rust"><th>TAP</th><th>DRILL (mm)</th></tr></thead>
+                                    <tbody className="divide-y divide-metal/30">
+                                        <tr><td>M3 x 0.5</td><td>2.5</td></tr>
+                                        <tr><td>M4 x 0.7</td><td>3.3</td></tr>
+                                        <tr><td>M5 x 0.8</td><td>4.2</td></tr>
+                                        <tr><td>M6 x 1.0</td><td>5.0</td></tr>
+                                        <tr><td>M8 x 1.25</td><td>6.8</td></tr>
+                                        <tr><td>M10 x 1.5</td><td>8.5</td></tr>
+                                        <tr><td>M12 x 1.75</td><td>10.2</td></tr>
+                                        <tr><td>M16 x 2.0</td><td>14.0</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {mode === 'NOTES' && (
+                            <div className="h-full flex flex-col">
+                                <textarea value={notes} onChange={e=>saveNotes(e.target.value)} className="flex-1 w-full bg-black border border-metal p-2 text-white font-mono text-sm resize-none" placeholder="Quick notes (saved automatically)..."></textarea>
+                            </div>
+                        )}
 
                         {mode === 'UPLOAD' && (
                             <div className="space-y-4 text-center">
@@ -760,6 +876,7 @@
                     <div className="flex justify-between items-end border-b-4 border-surface pb-4 mb-6 no-print">
                         <div><h1 className="font-stencil text-2xl leading-none">MANKU METAL <span className="text-rust">WORKS</span></h1></div>
                         <div className="flex gap-2">
+                            <button onClick={()=>window.mockFetch('/api/settings', {method:'PUT', body:JSON.stringify({theme: data.settings?.theme==='light'?'dark':'light'})}).then(refreshData)} className="bg-surface p-2 border border-metal">{data.settings?.theme === 'light' ? <Moon size={16}/> : <Sun size={16}/>}</button>
                             {user && <button onClick={()=>setTools(true)} className="bg-surface p-2 border border-metal"><Ruler size={16} /></button>}
                             {user && <button onClick={()=>setHud(true)} className="bg-rust text-black p-2 font-bold"><Camera size={16} /></button>}
                             {!user && <button onClick={()=>setLoginOpen(true)} className="bg-surface border border-metal px-3 py-1 font-bold text-xs">LOGIN</button>}
@@ -992,15 +1109,19 @@
                                 <h2 className="font-stencil text-xl border-b border-surface pb-2">MY JOBS</h2>
                                 <div className="bg-surface p-4 border border-metal">
                                     <h3 className="font-bold mb-2 text-xs">ACTIVE ORDERS</h3>
-                                    {data.jobs.filter(j => j.clientId === user?.id).map(j => (
+                                    {data.jobs.filter(j => j.clientId === user?.id).map(j => {
+                                        const paid = j.advances ? j.advances.reduce((a,b)=>a+parseInt(b.amount),0) : 0;
+                                        const bal = j.cost - paid;
+                                        return (
                                         <div key={j.id} className="mb-4 border-b border-metal/30 pb-4 last:border-0">
                                             <div className="flex justify-between font-bold"><span>{j.project}</span><span className="text-rust">{j.status}</span></div>
                                             <div className="text-xs text-metal mt-1">Date: {j.date} | Cost: ₹{j.cost}</div>
+                                            {bal > 0 && <div className="text-xs text-red-500 font-bold mt-1">BALANCE DUE: ₹{bal}</div>}
                                             <div className="mt-2 text-xs bg-black/30 p-2">
                                                 <div>Updates: Material Procured</div>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                                 <div className="bg-surface p-4 border border-metal">
                                     <h3 className="font-bold mb-2 text-xs">PAYMENT HISTORY</h3>
@@ -1038,8 +1159,11 @@
                             <div className="space-y-4">
                                 <div className="bg-surface p-4 border border-metal">
                                     <h3 className="font-bold mb-2 text-xs">INVENTORY & STOCK</h3>
+                                    <input placeholder="Search Inventory..." className="w-full bg-black border border-metal p-2 text-white mb-2 text-xs" onChange={e=>setSearchTerm(e.target.value)} />
                                     <div className="space-y-2">
-                                        {data.inventory.map(i => (
+                                        {data.inventory
+                                            .filter(i => i.item.toLowerCase().includes(searchTerm.toLowerCase()))
+                                            .map(i => (
                                             <div key={i.id} className="flex justify-between items-center bg-black/20 p-2">
                                                 <div><div className="font-bold">{i.item}</div><div className="text-[10px] text-metal">Usage: {i.usage}</div></div>
                                                 <div className="flex items-center gap-4">
@@ -1057,10 +1181,13 @@
                                     <h3 className="font-bold mb-2 text-xs">VENDORS</h3>
                                     <div className="space-y-2">
                                         {data.vendors && data.vendors.map(v => (
-                                            <div key={v.id} className="bg-black/20 p-2 text-sm">
-                                                <div className="font-bold">{v.name}</div>
-                                                <div className="text-xs text-metal">{v.contact} | {v.phone}</div>
-                                                <div className="text-[10px] text-rust mt-1">Sells: {v.material}</div>
+                                            <div key={v.id} className="bg-black/20 p-2 text-sm flex justify-between items-center">
+                                                <div>
+                                                    <div className="font-bold">{v.name}</div>
+                                                    <div className="text-xs text-metal">{v.contact} | {v.phone}</div>
+                                                    <div className="text-[10px] text-rust mt-1">Sells: {v.material}</div>
+                                                </div>
+                                                <a href={`tel:${v.phone}`} className="bg-white text-black p-2 rounded-full"><Phone size={14} /></a>
                                             </div>
                                         ))}
                                     </div>
@@ -1200,6 +1327,10 @@
                                 <div className="flex gap-2">
                                     <button onClick={()=>{setEditJob(jobDetail)}} className="flex-1 bg-surface border border-metal text-white py-3 hover:bg-black">EDIT</button>
                                     <button onClick={()=>{setQuoteJob(jobDetail); setJobDetail(null)}} className="flex-1 bg-white text-black font-bold py-3 hover:bg-gray-200">QUOTE</button>
+                                    <button onClick={()=>{
+                                        const text = `*JOB UPDATE*\nProject: ${jobDetail.project}\nStatus: ${jobDetail.status}\nCost: ₹${jobDetail.cost}`;
+                                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                                    }} className="bg-green-600 text-black px-4 py-3"><Share2 size={20}/></button>
                                 </div>
                             </div>
                         </div>
