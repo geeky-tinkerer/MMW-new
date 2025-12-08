@@ -142,6 +142,24 @@
             return { json: async () => DB.settings };
         }
 
+        // --- GAS PROXY (Simulated) ---
+        if (url === '/api/exec' && method === 'POST') {
+            if (body.action === 'upload_image') {
+                console.log("[MOCK] Upload Image:", body.filename, body.mimeType);
+
+                // Stress Test Simulation: Random Failures or Timeouts
+                // if (Math.random() < 0.1) return { status: 500, json: async () => ({error: "Simulated Server Error"}) };
+
+                // GAS Payload Limit Check (approx 2MB limit usually, but user said 50KB or something small? No "payload limits" usually means 50MB for POST, but GAS execution time is limit. User mentioned base64 string exceeds limits.)
+                // Let's assume the compression target is ~150KB. If we get something huge, we fail.
+                if (body.image.length > 2000000) { // 2MB roughly
+                     return { status: 413, json: async() => ({error: "Payload Too Large"}) };
+                }
+
+                return { json: async () => ({status: "success", url: "https://placehold.co/600x400/green/white?text=Uploaded+Image"}) };
+            }
+        }
+
         return { json: async () => DB };
     };
 })();
