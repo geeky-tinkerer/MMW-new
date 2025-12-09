@@ -1,11 +1,19 @@
 (function() {
     const SEED = {
         jobs: [
-            {id:"J-101", client:"Tata Motors", clientId:"C-1", project:"Chassis Bracket", status:"PENDING", cost:15000, date:"2023-10-01", materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-102", client:"Mahindra", clientId:"C-2", project:"Gearbox Mount", status:"ACTIVE", cost:8500, date:"2023-10-05", materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-103", client:"Tata Motors", clientId:"C-1", project:"Door Hinge Prototype", status:"DONE", cost:12000, date:"2023-09-20", materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-104", client:"Bajaj Auto", clientId:"C-3", project:"Kickstand Assembly", status:"DONE", cost:4500, date:"2023-09-15", materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-105", client:"Mahindra", clientId:"C-2", project:"Bumper Guard", status:"ACTIVE", cost:22000, date:"2023-10-10", materialLog:[], expenses:[], advances:[], workLog:[]}
+            {id:"J-101", client:"Tata Motors", clientId:"C-1", project:"Chassis Bracket", status:"PENDING", cost:15000, date:"2023-10-01", deliveryDate: "2023-10-15", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
+            {id:"J-102", client:"Mahindra", clientId:"C-2", project:"Gearbox Mount", status:"ACTIVE", cost:8500, date:"2023-10-05", deliveryDate: "2023-10-20", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
+            {id:"J-103", client:"Tata Motors", clientId:"C-1", project:"Door Hinge Prototype", status:"DONE", cost:12000, date:"2023-09-20", deliveryDate: "2023-09-25", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
+            {id:"J-104", client:"Bajaj Auto", clientId:"C-3", project:"Kickstand Assembly", status:"DONE", cost:4500, date:"2023-09-15", deliveryDate: "2023-09-18", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
+            {id:"J-105", client:"Mahindra", clientId:"C-2", project:"Bumper Guard", status:"ACTIVE", cost:22000, date:"2023-10-10", deliveryDate: "2023-10-30", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]}
+        ],
+        requests: [
+            {id:"R-1", type:"APPT", clientId:"C-1", clientName:"Ramesh Engineer", status:"OPEN", details:{date:"2023-11-01", time:"10:00", reason:"New Project Discussion"}, date:"2023-10-25"},
+            {id:"R-2", type:"QUOTE", clientId:"C-2", clientName:"Suresh Patil", status:"CLOSED", details:{desc:"Safety Grill for 3 windows", image:null}, date:"2023-10-20"}
+        ],
+        notifications: [
+            {id:"N-1", userId:"C-1", text:"Your order J-101 is now PENDING approval.", date:"2023-10-01", read: false},
+            {id:"N-2", userId:"C-2", text:"Payment received for J-102.", date:"2023-10-06", read: true}
         ],
         clients: [
             {id:"C-1", name:"Ramesh Engineer", company:"Tata Motors", phone:"919999999999", history:["J-101", "J-99", "J-103"], password:"123"},
@@ -188,6 +196,35 @@
             DB.settings = { ...DB.settings, ...body };
             saveData();
             return { ok: true, status: 200, json: async () => DB.settings };
+        }
+
+        // --- REQUESTS ---
+        if (url === '/api/requests' && method === 'POST') {
+            const req = { id: `R-${Date.now()}`, status: "OPEN", date: new Date().toISOString().split('T')[0], ...body };
+            if (!DB.requests) DB.requests = [];
+            DB.requests.unshift(req);
+            saveData();
+            return { ok: true, status: 200, json: async () => req };
+        }
+        if (url.startsWith('/api/requests/') && method === 'PUT') {
+            const id = url.split('/').pop();
+            const idx = DB.requests.findIndex(r => r.id === id);
+            if (idx > -1) {
+                DB.requests[idx] = { ...DB.requests[idx], ...body };
+                saveData();
+                return { ok: true, status: 200, json: async () => DB.requests[idx] };
+            }
+        }
+
+        // --- NOTIFICATIONS ---
+        if (url.startsWith('/api/notifications/') && method === 'PUT') {
+            const id = url.split('/').pop();
+            const idx = DB.notifications.findIndex(n => n.id === id);
+            if (idx > -1) {
+                DB.notifications[idx] = { ...DB.notifications[idx], ...body };
+                saveData();
+                return { ok: true, status: 200, json: async () => DB.notifications[idx] };
+            }
         }
 
         // --- GAS PROXY (Simulated) ---
