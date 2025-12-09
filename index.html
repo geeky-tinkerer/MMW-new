@@ -2171,7 +2171,7 @@
                         </div>
                     )}
 
-                    {jobDetail && (
+                    {jobDetail && view !== 'JOB_DETAIL' && user?.role === 'ADMIN' && (
                         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
                             <div className="bg-surface border-2 border-rust w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
                                 <button onClick={()=>setJobDetail(null)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
