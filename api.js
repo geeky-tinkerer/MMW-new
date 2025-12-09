@@ -189,6 +189,63 @@
         return { json: async () => DB };
     };
 
+    // --- UPLOAD HANDLER (Client-Side Compression) ---
+    window.nexusApi.upload = (file) => new Promise((resolve, reject) => {
+        // Validation
+        if (!file || !file.type.startsWith('image/')) {
+            reject(new Error("Invalid file type. Only images are allowed."));
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1024; // Constraint for GAS payload limit
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Compress to JPEG 0.7 quality
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+                // Optimistic UI Update (Resolve immediately)
+                resolve(compressedBase64);
+
+                // Silent Background Upload
+                window.nexusApi('/api/upload', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: "upload_image",
+                        image: compressedBase64,
+                        mimeType: "image/jpeg",
+                        filename: file.name
+                    })
+                }).catch(e => {
+                    console.error("Background Upload Failed", e);
+                    // Dispatch error event for UI
+                    window.dispatchEvent(new CustomEvent('nexus-upload-error', {
+                        detail: { message: "Sync Failed: Background upload failed.", error: e }
+                    }));
+                });
+            };
+            img.onerror = (e) => reject(new Error("Image failed to load."));
+        };
+        reader.onerror = (error) => reject(new Error("File reading failed."));
+    });
+
     // ALIAS FOR BACKWARD COMPATIBILITY
     window.mockFetch = window.nexusApi;
 

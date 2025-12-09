@@ -436,8 +436,12 @@
                             </div>
 
                             {/* Snap-to-Quote Placeholder (Engineering Hub) */}
-                            <div className="no-print bg-gray-100 p-2 mb-4 border border-dashed border-gray-400 text-center text-xs text-gray-500 cursor-pointer hover:bg-gray-200">
+                            <div className="no-print bg-gray-100 p-2 mb-4 border border-dashed border-gray-400 text-center text-xs text-gray-500 cursor-pointer hover:bg-gray-200" onClick={()=>document.getElementById('quote-upload').click()}>
                                 📸 SNAP BROKEN PART TO AUTO-QUOTE (GEMINI AI INTEGRATION)
+                                <input type="file" id="quote-upload" className="hidden" accept="image/*" onChange={(e)=>{
+                                    const file = e.target.files[0];
+                                    if(file) window.nexusApi.upload(file).then(res => alert("Image Processed (Mock AI Analysis Triggered)")).catch(err => console.error(err));
+                                }} />
                             </div>
 
                             <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-8">
@@ -489,6 +493,18 @@
             const [editJob, setEditJob] = useState(null); // Job Object being edited
             const [showNewJob, setShowNewJob] = useState(false);
             const [loginOpen, setLoginOpen] = useState(false);
+
+            // Toast Notification State
+            const [toast, setToast] = useState(null);
+
+            useEffect(() => {
+                const handleUploadError = (e) => {
+                    setToast({ message: e.detail.message || "Upload Error", type: "error" });
+                    setTimeout(() => setToast(null), 5000);
+                };
+                window.addEventListener('nexus-upload-error', handleUploadError);
+                return () => window.removeEventListener('nexus-upload-error', handleUploadError);
+            }, []);
 
             // Showcase State
             const [showcaseFilter, setShowcaseFilter] = useState('ALL');
@@ -1180,6 +1196,13 @@
                     {hud && <FabricatorHUD onClose={()=>setHud(false)} />}
                     {tools && <ToolsModal onClose={()=>setTools(false)} activeJobs={activeJobs} onSaveCalculation={saveCalculationToJob} />}
                     {quoteJob && <QuoteModal job={quoteJob} onClose={()=>setQuoteJob(null)} />}
+
+                    {/* TOAST NOTIFICATION */}
+                    {toast && (
+                        <div className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full font-bold shadow-lg z-[100] ${toast.type==='error'?'bg-red-600 text-white':'bg-green-600 text-white'}`}>
+                            {toast.message}
+                        </div>
+                    )}
                 </div>
             );
         };
