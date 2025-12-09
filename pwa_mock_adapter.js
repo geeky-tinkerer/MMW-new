@@ -1,11 +1,11 @@
 (function() {
     const SEED = {
         jobs: [
-            {id:"J-101", client:"Tata Motors", clientId:"C-1", project:"Chassis Bracket", status:"PENDING", cost:15000, date:"2023-10-01", deliveryDate: "2023-10-15", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-102", client:"Mahindra", clientId:"C-2", project:"Gearbox Mount", status:"ACTIVE", cost:8500, date:"2023-10-05", deliveryDate: "2023-10-20", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-103", client:"Tata Motors", clientId:"C-1", project:"Door Hinge Prototype", status:"DONE", cost:12000, date:"2023-09-20", deliveryDate: "2023-09-25", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-104", client:"Bajaj Auto", clientId:"C-3", project:"Kickstand Assembly", status:"DONE", cost:4500, date:"2023-09-15", deliveryDate: "2023-09-18", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]},
-            {id:"J-105", client:"Mahindra", clientId:"C-2", project:"Bumper Guard", status:"ACTIVE", cost:22000, date:"2023-10-10", deliveryDate: "2023-10-30", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[]}
+            {id:"J-101", client:"Tata Motors", clientId:"C-1", project:"Chassis Bracket", status:"PENDING", cost:15000, date:"2023-10-01", deliveryDate: "2023-10-15", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[], notes:[{id:"N1", text:"Initial Concept Approved", date:"2023-10-02", isPublic:true}]},
+            {id:"J-102", client:"Mahindra", clientId:"C-2", project:"Gearbox Mount", status:"ACTIVE", cost:8500, date:"2023-10-05", deliveryDate: "2023-10-20", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[], notes:[]},
+            {id:"J-103", client:"Tata Motors", clientId:"C-1", project:"Door Hinge Prototype", status:"DONE", cost:12000, date:"2023-09-20", deliveryDate: "2023-09-25", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[], notes:[]},
+            {id:"J-104", client:"Bajaj Auto", clientId:"C-3", project:"Kickstand Assembly", status:"DONE", cost:4500, date:"2023-09-15", deliveryDate: "2023-09-18", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[], notes:[]},
+            {id:"J-105", client:"Mahindra", clientId:"C-2", project:"Bumper Guard", status:"ACTIVE", cost:22000, date:"2023-10-10", deliveryDate: "2023-10-30", gallery: [], materialLog:[], expenses:[], advances:[], workLog:[], notes:[]}
         ],
         requests: [
             {id:"R-1", type:"APPT", clientId:"C-1", clientName:"Ramesh Engineer", status:"OPEN", details:{date:"2023-11-01", time:"10:00", reason:"New Project Discussion"}, date:"2023-10-25"},
@@ -110,7 +110,7 @@
             const newJob = {
                 id: `J-${Date.now()}`,
                 status: "PENDING",
-                materialLog:[], expenses:[], advances:[], workLog:[],
+                materialLog:[], expenses:[], advances:[], workLog:[], notes:[],
                 ...body
             };
             DB.jobs.unshift(newJob);
@@ -134,7 +134,7 @@
         }
 
         // --- CLIENTS, INVENTORY, VENDORS, TEMPLATES (Standard Create) ---
-        ['clients', 'inventory', 'vendors', 'templates', 'showcase'].forEach(coll => {
+        ['clients', 'inventory', 'vendors', 'templates', 'showcase', 'offers'].forEach(coll => {
             if (url === `/api/${coll}` && method === 'POST') {
                 const item = { ...body, id: `${coll[0].toUpperCase()}-${Date.now()}` };
                 if(coll==='clients') item.history = [];
@@ -153,6 +153,7 @@
         if (url === '/api/templates' && method === 'POST') return { ok: true, status: 200, json: async () => DB.templates[DB.templates.length-1] };
         if (url === '/api/inventory' && method === 'POST') return { ok: true, status: 200, json: async () => DB.inventory[DB.inventory.length-1] };
         if (url === '/api/showcase' && method === 'POST') return { ok: true, status: 200, json: async () => DB.showcase[DB.showcase.length-1] };
+        if (url === '/api/offers' && method === 'POST') return { ok: true, status: 200, json: async () => DB.offers[DB.offers.length-1] };
 
         // --- UPDATES (PUT) ---
         if (url.startsWith('/api/clients/') && method === 'PUT') {
