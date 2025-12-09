@@ -62,7 +62,7 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users, Settings, LogOut, Download, UploadCloud, AlertTriangle, Plus, Edit, X, ChevronLeft, ChevronRight, Save, Phone, Share2, Sun, Moon, StickyNote, Table, Circle, Dna, Search } = LucideReact;
+        const { Camera, Calculator, Hammer, FileText, Ruler, Grid, Activity, Users, Settings, LogOut, Download, UploadCloud, AlertTriangle, Plus, Edit, X, ChevronLeft, ChevronRight, Save, Phone, Share2, Sun, Moon, StickyNote, Table, Circle, Dna, Search, User, Home, Calendar, MessageSquare, Image, Truck } = LucideReact;
 
         // API SERVICE (External to React for broader scope)
         const api = {
@@ -717,7 +717,7 @@
                 else {
                     const u = await res.json();
                     setUser(u);
-                    setView(u.role === 'ADMIN' ? 'DASH' : u.role === 'CLIENT' ? 'MY_JOBS' : 'VISITOR');
+                    setView(u.role === 'ADMIN' ? 'DASH' : u.role === 'CLIENT' ? 'CLIENT_HOME' : 'VISITOR');
                 }
             };
 
@@ -877,11 +877,17 @@
             return (
                 <div className={`min-h-screen p-4 flex flex-col max-w-xl mx-auto pb-20 ${data.settings?.theme === 'light' ? 'bg-white text-black' : ''}`}>
                     <div className="flex justify-between items-end border-b-4 border-surface pb-4 mb-6 no-print">
-                        <div><h1 className="font-stencil text-2xl leading-none">MANKU METAL <span className="text-rust">WORKS</span></h1></div>
+                        <div>
+                            {user?.role === 'CLIENT' ? (
+                                <h1 className="font-stencil text-2xl leading-none flex items-center gap-2"><User size={24} className="text-rust"/> CLIENT VIEW</h1>
+                            ) : (
+                                <h1 className="font-stencil text-2xl leading-none">MANKU METAL <span className="text-rust">WORKS</span></h1>
+                            )}
+                        </div>
                         <div className="flex gap-2">
                             <button onClick={()=>window.mockFetch('/api/settings', {method:'PUT', body:JSON.stringify({theme: data.settings?.theme==='light'?'dark':'light'})}).then(refreshData)} className="bg-surface p-2 border border-metal">{data.settings?.theme === 'light' ? <Moon size={16}/> : <Sun size={16}/>}</button>
-                            {user && <button onClick={()=>setTools(true)} className="bg-surface p-2 border border-metal"><Ruler size={16} /></button>}
-                            {user && <button onClick={()=>setHud(true)} className="bg-rust text-black p-2 font-bold"><Camera size={16} /></button>}
+                            {user?.role === 'ADMIN' && <button onClick={()=>setTools(true)} className="bg-surface p-2 border border-metal"><Ruler size={16} /></button>}
+                            {user?.role === 'ADMIN' && <button onClick={()=>setHud(true)} className="bg-rust text-black p-2 font-bold"><Camera size={16} /></button>}
                             {!user && <button onClick={()=>setLoginOpen(true)} className="bg-surface border border-metal px-3 py-1 font-bold text-xs">LOGIN</button>}
                             {user && <button onClick={()=>{setUser(null);setView('VISITOR')}} className="bg-surface border border-metal p-2"><LogOut size={16} /></button>}
                         </div>
@@ -935,6 +941,90 @@
                                         <textarea placeholder="Job Description" className="w-full bg-black border border-metal p-2 text-white"></textarea>
                                         <button className="w-full bg-rust py-2 font-bold text-black">SEND REQUEST</button>
                                     </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'CLIENT_HOME' && (
+                            <div className="space-y-6">
+                                {/* Search & Filters */}
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-3 text-metal" size={16} />
+                                        <input placeholder="Search orders, invoices..." className="w-full bg-surface border border-metal pl-10 p-2 text-white placeholder-metal focus:border-rust outline-none rounded-full" />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <select className="flex-1 bg-surface border border-metal p-2 text-xs text-white rounded">
+                                            <option>Select Vehicle</option>
+                                            <option>Tata Ace</option>
+                                            <option>Mahindra Bolero</option>
+                                            <option>Ashok Leyland Dost</option>
+                                        </select>
+                                        <select className="flex-1 bg-surface border border-metal p-2 text-xs text-white rounded">
+                                            <option>Category</option>
+                                            <option>Fabrication</option>
+                                            <option>Repairs</option>
+                                            <option>Maintenance</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Quick Actions Grid */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>alert("Vehicle Info feature coming soon!")}>
+                                        <div className="bg-black p-3 rounded-full"><Users size={20} className="text-rust"/></div>
+                                        <span className="text-xs font-bold">Vehicle Info</span>
+                                    </div>
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>setView('MY_JOBS')}>
+                                        <div className="bg-black p-3 rounded-full"><FileText size={20} className="text-rust"/></div>
+                                        <span className="text-xs font-bold">Current Job Card</span>
+                                    </div>
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>setView('MY_JOBS')}>
+                                        <div className="bg-black p-3 rounded-full"><Calendar size={20} className="text-rust"/></div>
+                                        <span className="text-xs font-bold">Past History</span>
+                                    </div>
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>alert("No outstanding payments.")}>
+                                        <div className="bg-black p-3 rounded-full"><Activity size={20} className="text-rust"/></div>
+                                        <span className="text-xs font-bold">Payments</span>
+                                    </div>
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer col-span-2 h-24 flex-row" onClick={()=>setView('SHOWCASE')}>
+                                        <div className="bg-black p-3 rounded-full"><Image size={20} className="text-rust"/></div>
+                                        <span className="text-xs font-bold">View Gallery</span>
+                                    </div>
+                                </div>
+
+                                {/* Primary Actions */}
+                                <div className="space-y-3">
+                                    <button onClick={()=>window.showToast("Pickup Requested! We will call you shortly.", "success")} className="w-full bg-rust text-black font-bold py-3 rounded-full flex items-center justify-center gap-2 shadow-lg shadow-rust/20">
+                                        <Truck size={18} /> REQUEST PICK UP
+                                    </button>
+                                    <button onClick={()=>window.showToast("Appointment Request Sent!", "success")} className="w-full bg-white text-black font-bold py-3 rounded-full flex items-center justify-center gap-2">
+                                        <Calendar size={18} /> SCHEDULE APPT.
+                                    </button>
+                                </div>
+
+                                {/* Quick Upload */}
+                                <div className="bg-surface border-2 border-dashed border-metal/50 p-6 rounded-xl relative group">
+                                    <div className="flex flex-col items-center text-center gap-2">
+                                        <UploadCloud size={32} className="text-metal group-hover:text-rust transition-colors"/>
+                                        <h3 className="font-bold text-white">Have a Query?</h3>
+                                        <p className="text-xs text-metal">Upload a photo of your requirement or vehicle part.</p>
+                                    </div>
+                                    <input type="file" accept="image/*" onChange={(e)=>{
+                                        const file = e.target.files[0];
+                                        if(file) {
+                                            window.showToast("Compressing & Uploading...", "info");
+                                            api.upload(file).then(()=>{
+                                                window.showToast("Photo Sent Successfully!", "success");
+                                            }).catch(()=>window.showToast("Upload Failed", "error"));
+                                        }
+                                    }} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                                </div>
+
+                                {/* Promo / Offer */}
+                                <div className="bg-gradient-to-r from-rust to-orange-700 p-4 rounded-xl text-black">
+                                    <div className="font-stencil text-xl">MONSOON SALE</div>
+                                    <p className="text-sm font-bold">Get 10% OFF on all Gate Fabrication orders this month!</p>
                                 </div>
                             </div>
                         )}
@@ -1109,22 +1199,36 @@
 
                         {view === 'MY_JOBS' && (
                             <div className="space-y-4">
-                                <h2 className="font-stencil text-xl border-b border-surface pb-2">MY JOBS</h2>
+                                <h2 className="font-stencil text-xl border-b border-surface pb-2">MY ORDERS</h2>
                                 <div className="bg-surface p-4 border border-metal">
-                                    <h3 className="font-bold mb-2 text-xs">ACTIVE ORDERS</h3>
-                                    {data.jobs.filter(j => j.clientId === user?.id).map(j => {
-                                        const paid = j.advances ? j.advances.reduce((a,b)=>a+parseInt(b.amount),0) : 0;
-                                        const bal = j.cost - paid;
-                                        return (
-                                        <div key={j.id} className="mb-4 border-b border-metal/30 pb-4 last:border-0">
-                                            <div className="flex justify-between font-bold"><span>{j.project}</span><span className="text-rust">{j.status}</span></div>
-                                            <div className="text-xs text-metal mt-1">Date: {j.date} | Cost: ₹{j.cost}</div>
-                                            {bal > 0 && <div className="text-xs text-red-500 font-bold mt-1">BALANCE DUE: ₹{bal}</div>}
-                                            <div className="mt-2 text-xs bg-black/30 p-2">
-                                                <div>Updates: Material Procured</div>
-                                            </div>
+                                    <h3 className="font-bold mb-2 text-xs">YOUR ORDERS</h3>
+                                    {data.jobs.filter(j => j.clientId === user?.id).length === 0 ? (
+                                        <div className="text-center py-8 opacity-50">
+                                            <FileText className="mx-auto mb-2 text-metal" size={32} />
+                                            <p className="text-sm">No active orders found.</p>
                                         </div>
-                                    )})}
+                                    ) : (
+                                        data.jobs.filter(j => j.clientId === user?.id).map(j => {
+                                            const paid = j.advances ? j.advances.reduce((a,b)=>a+parseInt(b.amount),0) : 0;
+                                            const bal = j.cost - paid;
+                                            const statusColor = {PENDING:'bg-yellow-500/20 text-yellow-500', ACTIVE:'bg-orange-500/20 text-orange-500', DONE:'bg-green-500/20 text-green-500'}[j.status] || 'text-white';
+                                            return (
+                                            <div key={j.id} className="mb-4 border-b border-metal/30 pb-4 last:border-0">
+                                                <div className="flex justify-between items-center font-bold">
+                                                    <span>{j.project}</span>
+                                                    <span className={`text-[10px] px-2 py-1 rounded ${statusColor}`}>{j.status}</span>
+                                                </div>
+                                                <div className="text-xs text-metal mt-1">Date: {j.date} | Cost: ₹{j.cost}</div>
+                                                {bal > 0 && <div className="text-xs text-red-500 font-bold mt-1">BALANCE DUE: ₹{bal}</div>}
+                                                <div className="mt-2 text-xs bg-black/30 p-2 rounded">
+                                                    <div className="flex gap-2 items-center">
+                                                        <Activity size={12} className="text-rust"/>
+                                                        <span>Latest: Material Procured</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )})
+                                    )}
                                 </div>
                                 <div className="bg-surface p-4 border border-metal">
                                     <h3 className="font-bold mb-2 text-xs">PAYMENT HISTORY</h3>
@@ -1150,35 +1254,67 @@
                                     </div>
                                 </div>
 
-                                {/* Business Config */}
-                                <div className="bg-surface p-4 border border-metal/30 relative">
-                                    <div className="absolute -top-3 left-4 bg-rust text-black px-2 text-xs font-bold">BUSINESS</div>
-                                    <div className="space-y-4 mt-2">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-bold">Monthly Revenue Target (₹)</label>
-                                            <input type="number" defaultValue={data.settings?.monthlyTarget} onChange={e=>window.mockFetch('/api/settings', {method:'PUT', body:JSON.stringify({monthlyTarget: parseInt(e.target.value)})}).then(refreshData)} className="w-full bg-black border border-metal p-2 text-white text-xs" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-bold">WhatsApp Blurb</label>
-                                            <textarea className="w-full bg-black border border-metal p-2 text-white text-xs" defaultValue={data.settings?.whatsappBlurb}></textarea>
-                                            <button className="w-full bg-rust text-black text-xs font-bold py-2 mt-2">UPDATE TEXT</button>
+                                {/* Client Profile */}
+                                {user?.role === 'CLIENT' && (
+                                    <div className="bg-surface p-4 border border-metal/30 relative">
+                                        <div className="absolute -top-3 left-4 bg-rust text-black px-2 text-xs font-bold">MY PROFILE</div>
+                                        <div className="space-y-3 mt-2">
+                                            <div className="flex justify-between text-sm border-b border-metal/30 pb-2">
+                                                <span className="text-metal">Name</span>
+                                                <span className="font-bold">{user.name}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm border-b border-metal/30 pb-2">
+                                                <span className="text-metal">Company</span>
+                                                <span className="font-bold">{user.company}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm border-b border-metal/30 pb-2">
+                                                <span className="text-metal">Phone</span>
+                                                <span className="font-bold">{user.phone}</span>
+                                            </div>
+                                            <div className="pt-2">
+                                                <label className="text-xs font-bold text-metal">Change Password</label>
+                                                <div className="flex gap-2 mt-1">
+                                                    <input type="password" placeholder="New Password" className="flex-1 bg-black border border-metal p-2 text-white text-xs" />
+                                                    <button onClick={()=>window.showToast("Password Update Not Implemented", "info")} className="bg-rust text-black px-3 font-bold text-xs">UPDATE</button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Data Management */}
-                                <div className="bg-surface p-4 border border-metal/30 relative">
-                                    <div className="absolute -top-3 left-4 bg-rust text-black px-2 text-xs font-bold">DATA</div>
-                                    <div className="mt-2 text-center">
-                                        <p className="text-xs text-metal mb-4">Resetting will clear all local data. This cannot be undone.</p>
-                                        <button onClick={()=>{
-                                            if(confirm("Are you sure? This will wipe all data!")) {
-                                                localStorage.removeItem('mmw_db');
-                                                window.location.reload();
-                                            }
-                                        }} className="border border-red-500 text-red-500 px-4 py-2 hover:bg-red-500 hover:text-white transition-colors text-xs font-bold">RESET APPLICATION DATA</button>
+                                {/* Business Config - ADMIN ONLY */}
+                                {user?.role === 'ADMIN' && (
+                                    <div className="bg-surface p-4 border border-metal/30 relative">
+                                        <div className="absolute -top-3 left-4 bg-rust text-black px-2 text-xs font-bold">BUSINESS</div>
+                                        <div className="space-y-4 mt-2">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold">Monthly Revenue Target (₹)</label>
+                                                <input type="number" defaultValue={data.settings?.monthlyTarget} onChange={e=>window.mockFetch('/api/settings', {method:'PUT', body:JSON.stringify({monthlyTarget: parseInt(e.target.value)})}).then(refreshData)} className="w-full bg-black border border-metal p-2 text-white text-xs" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold">WhatsApp Blurb</label>
+                                                <textarea className="w-full bg-black border border-metal p-2 text-white text-xs" defaultValue={data.settings?.whatsappBlurb}></textarea>
+                                                <button className="w-full bg-rust text-black text-xs font-bold py-2 mt-2">UPDATE TEXT</button>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+                                {/* Data Management - ADMIN ONLY */}
+                                {user?.role === 'ADMIN' && (
+                                    <div className="bg-surface p-4 border border-metal/30 relative">
+                                        <div className="absolute -top-3 left-4 bg-rust text-black px-2 text-xs font-bold">DATA</div>
+                                        <div className="mt-2 text-center">
+                                            <p className="text-xs text-metal mb-4">Resetting will clear all local data. This cannot be undone.</p>
+                                            <button onClick={()=>{
+                                                if(confirm("Are you sure? This will wipe all data!")) {
+                                                    localStorage.removeItem('mmw_db');
+                                                    window.location.reload();
+                                                }
+                                            }} className="border border-red-500 text-red-500 px-4 py-2 hover:bg-red-500 hover:text-white transition-colors text-xs font-bold">RESET APPLICATION DATA</button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="text-center text-metal text-[10px] pt-4">
                                     <p>Manku Metal Works v2.1.0</p>
@@ -1451,13 +1587,28 @@
                     )}
 
                     <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t-2 border-rust p-4 flex justify-around no-print">
-                        {user?.role === 'ADMIN' && <button onClick={()=>setView('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>}
-                        {user?.role === 'ADMIN' && <button onClick={()=>setView('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>}
-                        {user?.role === 'ADMIN' && <button onClick={()=>setView('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>}
-                        <button onClick={()=>setView('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal'}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></button>
-                        {user?.role === 'CLIENT' && <button onClick={()=>setView('MY_JOBS')} className={view==='MY_JOBS'?'text-rust':'text-metal'}><Activity /></button>}
-                        {user && <button onClick={()=>setView('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal'}><Settings /></button>}
-                        {!user && <button onClick={()=>setView('VISITOR')} className={view==='VISITOR'?'text-rust':'text-metal'}><Activity /></button>}
+                        {user?.role === 'ADMIN' && (
+                            <>
+                                <button onClick={()=>setView('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>
+                                <button onClick={()=>setView('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>
+                                <button onClick={()=>setView('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>
+                                <button onClick={()=>setView('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal'}><Image /></button>
+                                <button onClick={()=>setView('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal'}><Settings /></button>
+                            </>
+                        )}
+                        {user?.role === 'CLIENT' && (
+                            <>
+                                <button onClick={()=>setView('CLIENT_HOME')} className={view==='CLIENT_HOME'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Home size={20}/><span className="text-[10px]">Home</span></button>
+                                <button onClick={()=>setView('MY_JOBS')} className={view==='MY_JOBS'?'text-rust':'text-metal flex flex-col items-center gap-1'}><FileText size={20}/><span className="text-[10px]">Orders</span></button>
+                                <button onClick={()=>setView('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Settings size={20}/><span className="text-[10px]">Settings</span></button>
+                            </>
+                        )}
+                        {!user && (
+                            <>
+                                <button onClick={()=>setView('VISITOR')} className={view==='VISITOR'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Home size={20}/><span className="text-[10px]">Home</span></button>
+                                <button onClick={()=>setView('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Image size={20}/><span className="text-[10px]">Gallery</span></button>
+                            </>
+                        )}
                     </nav>
 
                     {loginOpen && (
@@ -1466,13 +1617,16 @@
                                 <button onClick={()=>setLoginOpen(false)} className="absolute top-2 right-2 text-metal hover:text-white">X</button>
                                 <h2 className="font-stencil text-2xl text-rust mb-4">LOGIN</h2>
                                 <form onSubmit={(e)=>{login(e); setLoginOpen(false);}} className="space-y-4">
-                                    <input name="user" placeholder="Username / Phone" required className="w-full bg-black border border-metal p-2 text-white" />
+                                    <input name="user" type="tel" placeholder="Client ID / Phone" required className="w-full bg-black border border-metal p-2 text-white" />
                                     <input name="pass" type="password" placeholder="Password" required className="w-full bg-black border border-metal p-2 text-white" />
                                     <button className="w-full bg-rust py-3 font-bold text-black">ACCESS PORTAL</button>
                                 </form>
                                 <div className="text-center text-xs text-metal mt-4">
-                                    <p>Admin: admin / admin</p>
-                                    <p>Client: 919999999999 / 123</p>
+                                    <p className="cursor-pointer hover:text-rust" onClick={()=>alert("Please contact admin to reset password.")}>Forgot Password?</p>
+                                    <div className="mt-2 opacity-50">
+                                        <p>Admin: admin / admin</p>
+                                        <p>Client: 919999999999 / 123</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
