@@ -46,6 +46,8 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .snap-x { scroll-snap-type: x mandatory; }
         .snap-center { scroll-snap-align: center; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @media print {
             body { background: white !important; color: black !important; }
             .no-print { display: none !important; }
@@ -672,8 +674,23 @@
 
         // 5. MAIN APP
         const App = () => {
-            const [user, setUser] = useState(null); // null = Visitor
-            const [view, setView] = useState('VISITOR');
+            const [user, setUser] = useState(() => {
+                const saved = localStorage.getItem('mmw_user');
+                return saved ? JSON.parse(saved) : null;
+            });
+
+            const getInitialView = () => {
+                const hash = window.location.hash.replace('#', '');
+                if (hash) return hash;
+                const savedUser = localStorage.getItem('mmw_user');
+                if (savedUser) {
+                    const u = JSON.parse(savedUser);
+                    return u.role === 'ADMIN' ? 'DASH' : u.role === 'CLIENT' ? 'CLIENT_HOME' : 'VISITOR';
+                }
+                return 'VISITOR';
+            };
+
+            const [view, setView] = useState(getInitialView);
             const [hud, setHud] = useState(false);
             const [tools, setTools] = useState(false);
             const [quoteJob, setQuoteJob] = useState(null);
@@ -700,6 +717,22 @@
                 };
             }, []);
 
+            // Navigation & History Listener
+            useEffect(() => {
+                const handlePopState = () => {
+                    const hash = window.location.hash.replace('#', '');
+                    if (hash) setView(hash);
+                    else setView(user ? (user.role==='ADMIN'?'DASH':'CLIENT_HOME') : 'VISITOR');
+                };
+                window.addEventListener('popstate', handlePopState);
+                return () => window.removeEventListener('popstate', handlePopState);
+            }, [user]);
+
+            const navigate = (newView) => {
+                setView(newView);
+                window.history.pushState({view: newView}, '', '#'+newView);
+            };
+
             const refreshData = () => window.mockFetch('/api/init').then(r => r.json()).then(setData);
             useEffect(() => { refreshData() }, []);
 
@@ -717,7 +750,8 @@
                 else {
                     const u = await res.json();
                     setUser(u);
-                    setView(u.role === 'ADMIN' ? 'DASH' : u.role === 'CLIENT' ? 'CLIENT_HOME' : 'VISITOR');
+                    localStorage.setItem('mmw_user', JSON.stringify(u));
+                    navigate(u.role === 'ADMIN' ? 'DASH' : u.role === 'CLIENT' ? 'CLIENT_HOME' : 'VISITOR');
                 }
             };
 
@@ -879,7 +913,7 @@
                     <div className="flex justify-between items-end border-b-4 border-surface pb-4 mb-6 no-print">
                         <div>
                             {user?.role === 'CLIENT' ? (
-                                <h1 className="font-stencil text-2xl leading-none flex items-center gap-2"><User size={24} className="text-rust"/> CLIENT VIEW</h1>
+                                <h1 onClick={()=>navigate('SETTINGS')} className="font-stencil text-2xl leading-none flex items-center gap-2 cursor-pointer hover:text-rust transition-colors"><User size={24} className="text-rust"/> CLIENT VIEW</h1>
                             ) : (
                                 <h1 className="font-stencil text-2xl leading-none">MANKU METAL <span className="text-rust">WORKS</span></h1>
                             )}
@@ -889,13 +923,13 @@
                             {user?.role === 'ADMIN' && <button onClick={()=>setTools(true)} className="bg-surface p-2 border border-metal"><Ruler size={16} /></button>}
                             {user?.role === 'ADMIN' && <button onClick={()=>setHud(true)} className="bg-rust text-black p-2 font-bold"><Camera size={16} /></button>}
                             {!user && <button onClick={()=>setLoginOpen(true)} className="bg-surface border border-metal px-3 py-1 font-bold text-xs">LOGIN</button>}
-                            {user && <button onClick={()=>{setUser(null);setView('VISITOR')}} className="bg-surface border border-metal p-2"><LogOut size={16} /></button>}
+                            {user && <button onClick={()=>{setUser(null);localStorage.removeItem('mmw_user');navigate('VISITOR')}} className="bg-surface border border-metal p-2"><LogOut size={16} /></button>}
                         </div>
                     </div>
 
                     <main className="flex-1 no-print">
                         {view === 'VISITOR' && (
-                            <div className="space-y-6">
+                            <div className="space-y-6 animate-fade-in">
                                 <div className="bg-rust p-4 text-black font-bold text-center">
                                     <h2 className="font-stencil text-2xl">WELCOME TO MANKU METAL</h2>
                                     <p className="text-sm">Premium Fabrication Services</p>
@@ -930,7 +964,7 @@
                                             </div>
                                         ))}
                                     </div>
-                                    <button onClick={()=>setView('SHOWCASE')} className="w-full border border-metal py-2 text-xs hover:bg-surface">VIEW FULL GALLERY</button>
+                                    <button onClick={()=>navigate('SHOWCASE')} className="w-full border border-metal py-2 text-xs hover:bg-surface">VIEW FULL GALLERY</button>
                                 </div>
 
                                 <div className="bg-surface p-4 border border-metal">
@@ -946,7 +980,15 @@
                         )}
 
                         {view === 'CLIENT_HOME' && (
-                            <div className="space-y-6">
+                            <div className="space-y-6 animate-fade-in">
+                                <div className="flex justify-between items-end border-b border-metal/30 pb-2">
+                                    <div>
+                                        <div className="text-xs text-rust font-bold">WELCOME BACK</div>
+                                        <div className="font-stencil text-xl">{user.name.split(' ')[0]}</div>
+                                    </div>
+                                    <div className="text-[10px] text-metal">{new Date().toDateString()}</div>
+                                </div>
+
                                 {/* Search & Filters */}
                                 <div className="space-y-2">
                                     <div className="relative">
@@ -975,11 +1017,11 @@
                                         <div className="bg-black p-3 rounded-full"><Users size={20} className="text-rust"/></div>
                                         <span className="text-xs font-bold">Vehicle Info</span>
                                     </div>
-                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>setView('MY_JOBS')}>
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>navigate('MY_JOBS')}>
                                         <div className="bg-black p-3 rounded-full"><FileText size={20} className="text-rust"/></div>
                                         <span className="text-xs font-bold">Current Job Card</span>
                                     </div>
-                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>setView('MY_JOBS')}>
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer" onClick={()=>navigate('MY_JOBS')}>
                                         <div className="bg-black p-3 rounded-full"><Calendar size={20} className="text-rust"/></div>
                                         <span className="text-xs font-bold">Past History</span>
                                     </div>
@@ -987,7 +1029,7 @@
                                         <div className="bg-black p-3 rounded-full"><Activity size={20} className="text-rust"/></div>
                                         <span className="text-xs font-bold">Payments</span>
                                     </div>
-                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer col-span-2 h-24 flex-row" onClick={()=>setView('SHOWCASE')}>
+                                    <div className="bg-surface border border-metal/30 p-3 flex flex-col items-center justify-center gap-2 aspect-square hover:border-rust transition-colors cursor-pointer col-span-2 h-24 flex-row" onClick={()=>navigate('SHOWCASE')}>
                                         <div className="bg-black p-3 rounded-full"><Image size={20} className="text-rust"/></div>
                                         <span className="text-xs font-bold">View Gallery</span>
                                     </div>
@@ -1030,7 +1072,7 @@
                         )}
 
                         {view === 'DASH' && (
-                            <div className="space-y-6">
+                            <div className="space-y-6 animate-fade-in">
                                 {/* CASH FLOW */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-surface p-4 border-l-4 border-green-600">
@@ -1082,15 +1124,17 @@
                                         <button onClick={()=>setShowNewJob(true)} className="bg-rust text-black px-2 py-1 text-xs font-bold">+ NEW JOB</button>
                                     </div>
                                     <div className="space-y-2">
-                                        {activeJobs.map(j => (
+                                        {activeJobs.map(j => {
+                                            const statusColor = {PENDING:'bg-yellow-500/20 text-yellow-500', ACTIVE:'bg-orange-500/20 text-orange-500', DONE:'bg-green-500/20 text-green-500'}[j.status] || 'text-white';
+                                            return (
                                             <div key={j.id} onClick={()=>setJobDetail(j)} className="bg-surface p-4 border border-surface hover:border-rust transition-colors group relative cursor-pointer">
-                                                <div className="flex justify-between">
+                                                <div className="flex justify-between items-center">
                                                     <h3 className="font-bold">{j.project}</h3>
-                                                    <span onClick={(e)=>{e.stopPropagation(); updateStatus(j, j.status==='PENDING'?'ACTIVE':j.status==='ACTIVE'?'DONE':'PENDING')}} className="text-xs bg-black px-2 py-1 text-rust cursor-pointer hover:bg-white hover:text-black">{j.status}</span>
+                                                    <span onClick={(e)=>{e.stopPropagation(); updateStatus(j, j.status==='PENDING'?'ACTIVE':j.status==='ACTIVE'?'DONE':'PENDING')}} className={`text-[10px] px-2 py-1 rounded font-bold cursor-pointer hover:bg-white hover:text-black ${statusColor}`}>{j.status}</span>
                                                 </div>
                                                 <p className="text-xs text-metal mt-1">{j.client}</p>
                                             </div>
-                                        ))}
+                                        )})}
                                     </div>
                                 </div>
 
@@ -1125,7 +1169,7 @@
                             </div>
                         )}
                         {view === 'CLIENTS' && (
-                            <div className="space-y-4">
+                            <div className="space-y-4 animate-fade-in">
                                 <div className="bg-surface p-4 border border-metal">
                                     <h3 className="font-bold mb-2 text-xs">ADD NEW CLIENT</h3>
                                     <form onSubmit={createClient} className="flex flex-col gap-2">
@@ -1151,7 +1195,7 @@
                         )}
 
                         {view === 'SHOWCASE' && (
-                            <div className="space-y-4">
+                            <div className="space-y-4 animate-fade-in">
                                 <div className="flex justify-between items-center border-b border-surface pb-2">
                                     <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                                         {['ALL', 'Gate', 'Grill', 'Industrial'].map(tag => (
@@ -1161,9 +1205,10 @@
                                     {user?.role === 'ADMIN' && <button onClick={()=>setShowAddShowcase(true)} className="bg-rust text-black px-2 py-1 text-xs font-bold whitespace-nowrap flex items-center gap-1"><Plus size={14}/> NEW</button>}
                                 </div>
                                 <div className="space-y-6">
-                                    {data.showcase
-                                        .filter(i => showcaseFilter === 'ALL' || i.tag === showcaseFilter)
-                                        .map(item => (
+                                    {data.showcase.filter(i => showcaseFilter === 'ALL' || i.tag === showcaseFilter).length === 0 ? (
+                                        <div className="text-center text-metal py-8 text-xs">No projects found for {showcaseFilter}</div>
+                                    ) : (
+                                        data.showcase.filter(i => showcaseFilter === 'ALL' || i.tag === showcaseFilter).map(item => (
                                         <div key={item.id} className="bg-surface border border-metal/30 relative group">
                                             {user?.role === 'ADMIN' && (
                                                 <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1192,13 +1237,13 @@
                                                 ))}
                                             </div>
                                         </div>
-                                    ))}
+                                    )))}
                                 </div>
                             </div>
                         )}
 
                         {view === 'MY_JOBS' && (
-                            <div className="space-y-4">
+                            <div className="space-y-4 animate-fade-in">
                                 <h2 className="font-stencil text-xl border-b border-surface pb-2">MY ORDERS</h2>
                                 <div className="bg-surface p-4 border border-metal">
                                     <h3 className="font-bold mb-2 text-xs">YOUR ORDERS</h3>
@@ -1238,7 +1283,7 @@
                         )}
 
                         {view === 'SETTINGS' && (
-                            <div className="space-y-6">
+                            <div className="space-y-6 animate-fade-in">
                                 <h2 className="font-stencil text-xl border-b border-surface pb-2">SETTINGS</h2>
 
                                 {/* Appearance */}
@@ -1274,8 +1319,11 @@
                                             <div className="pt-2">
                                                 <label className="text-xs font-bold text-metal">Change Password</label>
                                                 <div className="flex gap-2 mt-1">
-                                                    <input type="password" placeholder="New Password" className="flex-1 bg-black border border-metal p-2 text-white text-xs" />
-                                                    <button onClick={()=>window.showToast("Password Update Not Implemented", "info")} className="bg-rust text-black px-3 font-bold text-xs">UPDATE</button>
+                                                    <input id="pwd-input" type="password" placeholder="New Password" className="flex-1 bg-black border border-metal p-2 text-white text-xs" />
+                                                    <button onClick={()=>{
+                                                        window.showToast("Password Updated (Mock)", "success");
+                                                        document.getElementById('pwd-input').value = '';
+                                                    }} className="bg-rust text-black px-3 font-bold text-xs">UPDATE</button>
                                                 </div>
                                             </div>
                                         </div>
@@ -1324,7 +1372,7 @@
                         )}
 
                         {view === 'INV' && (
-                            <div className="space-y-4">
+                            <div className="space-y-4 animate-fade-in">
                                 <div className="bg-surface p-4 border border-metal">
                                     <h3 className="font-bold mb-2 text-xs">INVENTORY & STOCK</h3>
                                     <input placeholder="Search Inventory..." className="w-full bg-black border border-metal p-2 text-white mb-2 text-xs" onChange={e=>setSearchTerm(e.target.value)} />
@@ -1589,24 +1637,24 @@
                     <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t-2 border-rust p-4 flex justify-around no-print">
                         {user?.role === 'ADMIN' && (
                             <>
-                                <button onClick={()=>setView('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>
-                                <button onClick={()=>setView('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>
-                                <button onClick={()=>setView('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>
-                                <button onClick={()=>setView('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal'}><Image /></button>
-                                <button onClick={()=>setView('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal'}><Settings /></button>
+                                <button onClick={()=>navigate('DASH')} className={view==='DASH'?'text-rust':'text-metal'}><Activity /></button>
+                                <button onClick={()=>navigate('CLIENTS')} className={view==='CLIENTS'?'text-rust':'text-metal'}><Users /></button>
+                                <button onClick={()=>navigate('INV')} className={view==='INV'?'text-rust':'text-metal'}><Hammer /></button>
+                                <button onClick={()=>navigate('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal'}><Image /></button>
+                                <button onClick={()=>navigate('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal'}><Settings /></button>
                             </>
                         )}
                         {user?.role === 'CLIENT' && (
                             <>
-                                <button onClick={()=>setView('CLIENT_HOME')} className={view==='CLIENT_HOME'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Home size={20}/><span className="text-[10px]">Home</span></button>
-                                <button onClick={()=>setView('MY_JOBS')} className={view==='MY_JOBS'?'text-rust':'text-metal flex flex-col items-center gap-1'}><FileText size={20}/><span className="text-[10px]">Orders</span></button>
-                                <button onClick={()=>setView('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Settings size={20}/><span className="text-[10px]">Settings</span></button>
+                                <button onClick={()=>navigate('CLIENT_HOME')} className={view==='CLIENT_HOME'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Home size={20}/><span className="text-[10px]">Home</span></button>
+                                <button onClick={()=>navigate('MY_JOBS')} className={view==='MY_JOBS'?'text-rust':'text-metal flex flex-col items-center gap-1'}><FileText size={20}/><span className="text-[10px]">Orders</span></button>
+                                <button onClick={()=>navigate('SETTINGS')} className={view==='SETTINGS'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Settings size={20}/><span className="text-[10px]">Settings</span></button>
                             </>
                         )}
                         {!user && (
                             <>
-                                <button onClick={()=>setView('VISITOR')} className={view==='VISITOR'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Home size={20}/><span className="text-[10px]">Home</span></button>
-                                <button onClick={()=>setView('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Image size={20}/><span className="text-[10px]">Gallery</span></button>
+                                <button onClick={()=>navigate('VISITOR')} className={view==='VISITOR'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Home size={20}/><span className="text-[10px]">Home</span></button>
+                                <button onClick={()=>navigate('SHOWCASE')} className={view==='SHOWCASE'?'text-rust':'text-metal flex flex-col items-center gap-1'}><Image size={20}/><span className="text-[10px]">Gallery</span></button>
                             </>
                         )}
                     </nav>
