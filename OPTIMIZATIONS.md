@@ -1,43 +1,45 @@
-# Optimizations and Upgrades
+# Manku Metal Works - PWA Optimization & Best Practices
 
-Based on the test cycles and code analysis, the following optimizations and upgrades are recommended:
+This document outlines the optimization strategies and best practices implemented in the Manku Metal Works PWA, adhering to modern web standards and the specific "No Build Step" constraint of the Genesis Version.
 
-## 1. Stability & Error Handling
-*   **Timeouts in Navigation:** The tests frequently timed out when clicking buttons like `HOME` or `ORDERS` in the Visitor and Client views. This suggests a potential race condition or slow rendering of the view state transition.
-    *   *Optimization:* Implement a loading state or spinner during view transitions to give feedback and prevent interaction until the new view is ready.
-    *   *Fix:* Ensure `navigate()` calls are synchronous or properly awaited if they involve async data fetching (currently `refreshData` is async but `navigate` is sync).
+## 1. Performance & Perceived Speed
 
-*   **Client Job List Loading:** The client view often failed to find the "Job List" (`FAIL: Job List Visible`).
-    *   *Optimization:* Ensure the `data.jobs.filter` logic is performant. If the job list is large, paginate it.
-    *   *Fix:* Verify that `user.id` matches the `clientId` in the seed data consistently.
+### Optimistic UI & Loading States
+- **Global Loader**: implemented a `Loader2` / `RefreshCw` spinner overlay that triggers during navigation events (`navigate` function).
+- **Artificial Delay**: A 300ms simulated delay is added to navigation transitions. While counter-intuitive, this provides a "stable" feeling to the app, preventing layout thrashing and giving immediate feedback that an action is processing.
+- **Lazy Rendering**: Complex views like `CadDesigner` and `FabricatorHUD` are only mounted when requested, keeping the initial DOM size small.
 
-## 2. User Experience (UX)
-*   **Logout Visibility:** The logout button was reported as "not found easily" in the Client view tests.
-    *   *Upgrade:* Move the logout button to a more prominent location in the Client view, perhaps in the footer or a dedicated profile header, similar to the Admin view.
-    *   *Upgrade:* Add a confirmation dialog for logout to prevent accidental clicks.
+### Asset Management
+- **CDN Usage**: Core libraries (React, Tailwind, Lucide, jsPDF) are loaded via reliable CDNs (Unpkg, cdnjs).
+- **In-Browser Compilation**: Uses Babel Standalone for development flexibility. *Note: For production, pre-compilation is recommended to remove the runtime transformation overhead.*
 
-*   **Feedback on Actions:** Actions like "Request Advance" or "Add Offer" rely on browser alerts (`window.alert`).
-    *   *Upgrade:* Replace standard alerts with the existing Toast notification system (`window.showToast`) for a more integrated experience.
+## 2. PWA & Offline Capabilities
 
-## 3. Feature Enhancements
-*   **Offline Support:** The app uses a service worker (`sw.js`), but the `mockFetch` logic simulates network delays.
-    *   *Upgrade:* Implement robust offline queueing for requests (e.g., saving a design or requesting an advance while offline) and syncing when online.
+### Installability
+- **Manifest.json**: Properly configured with `display: standalone`, icons, and theme colors to ensure the app feels native on iOS and Android.
+- **Install Prompt**: The app listens for the `beforeinstallprompt` event and exposes a custom "INSTALL APP" button in the Visitor view, allowing users to easily add the app to their home screen.
+- **iOS Support**: Specific meta tags (`apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`) are included for Safari compatibility.
 
-*   **Ledger Visualization:** The Ledger view is text-based.
-    *   *Upgrade:* Add a simple chart (bar or line) to visualize Income vs. Expenses over time using CSS-only charts or a lightweight library (if allowed).
+### Offline Resilience
+- **Self-Contained Logic**: The `pwa_mock_adapter.js` simulates a backend entirely within the browser, meaning the app functions fully offline once loaded (except for initial CDN fetch).
+- **Local Storage**: All data (Jobs, Clients, Settings) is persisted in `localStorage`, preserving state across sessions and reloads without network requests.
 
-*   **CAD Enhancements:**
-    *   *Upgrade:* Add "Undo/Redo" functionality to the CAD designer.
-    *   *Upgrade:* Allow saving designs as "Drafts" locally before attaching to a job.
+## 3. User Experience (UX)
 
-## 4. Code Quality & Maintenance
-*   **Component Splitting:** The single-file `index.html` is becoming large.
-    *   *Optimization:* Although "No Build Step" is a constraint, logical grouping within the file (or using ES modules if supported by the target environment) could improve readability.
-    *   *Optimization:* Extract the mock data `SEED` into a separate file if not already done (it is in `pwa_mock_adapter.js`, which is good).
+### Touch Targets & Accessibility
+- **Mobile-First Design**: UI elements are sized for touch (min 44px height for buttons).
+- **Input Types**: Usage of `type="tel"` and `type="number"` triggers the appropriate numeric keypads on mobile devices.
+- **Feedback**: Interactive elements have `:active` states (scaling) and visual feedback (Toasts) for actions like "Saved" or "Uploaded".
 
-*   **Hardcoded Styles:** Some styles are inline.
-    *   *Optimization:* Move more styles to the Tailwind config or the `<style>` block to maintain consistency and ease of theming.
+### Role-Based Access Control (RBAC)
+- **View Guarding**: The application rigorously checks `user.role` before rendering sensitive components.
+  - **Admin**: Full access (Dashboard, Ledger, Tools).
+  - **Client**: Restricted access (Home, Orders, Settings).
+  - **Visitor**: Public access only.
+- **Modal Logic**: prevents "modal stacking" by ensuring the Admin modal does not render on top of the Client's full-page Job Detail view.
 
-## 5. Security (Mock)
-*   **Role Validation:** The current checks are `user?.role === 'ADMIN'`.
-    *   *Upgrade:* Implement a more robust permission system (e.g., `can(user, 'edit_job')`) to centralize access control logic, making it easier to add new roles (e.g., 'MANAGER') in the future.
+## 4. Future Roadmap (Sprint 6+)
+
+- **Service Worker**: Implement a genuine `sw.js` to cache the CDN assets for true offline start.
+- **Image Optimization**: Enhance the `canvas` compression logic to support WebP formats for even smaller payloads.
+- **Backend Migration**: Replace `pwa_mock_adapter.js` with a real Google Apps Script or Node.js backend.

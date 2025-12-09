@@ -42,8 +42,11 @@ The application is a single-file React PWA that serves as an operational dashboa
 7.  **PWA Features**:
     - "Install App" prompt for Visitors to add the app to their home screen.
     - Offline-capable UI (static assets).
+    - **Optimized Navigation**: Smooth transitions with global loading states to prevent layout shifts.
 
 ## Technical Details
+
+See [OPTIMIZATIONS.md](OPTIMIZATIONS.md) for a deep dive into performance and best practices.
 
 -   **Stack**: React 18, Tailwind CSS, Lucide Icons, jsPDF.
 -   **Architecture**: Single HTML file deployment (`index.html`) using Babel standalone for JSX compilation.
